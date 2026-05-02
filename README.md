@@ -21,10 +21,12 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 ```powershell
 # run
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
+```
+---
 
-## Usage
+### Option 2: CLI (Recommended for Pro Users)
 Command
-
+```
 Launch interactive menu
 .\OneDrive-Hybrid-Toolkit.ps1
 
@@ -57,5 +59,5 @@ Self-update from PSGallery
 
 Show current status
 .\OneDrive-Hybrid-Toolkit.ps1 -Status
-
+```
 🔐 Administrator rights required: The script will auto-relaunch as Admin if needed.
