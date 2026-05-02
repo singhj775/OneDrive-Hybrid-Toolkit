@@ -19,6 +19,5 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 
 ### Option 1: Interactive Menu (Recommended for Home Users)
 ```powershell
-# Download and run
-irm https://github.com/singhj775/OneDrive-Hybrid-Toolkit/raw/main/OneDrive-Hybrid-Toolkit.ps1 -OutFile "$env:TEMP\OneDriveToolkit.ps1"
-& "$env:TEMP\OneDriveToolkit.ps1"
+# run
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
