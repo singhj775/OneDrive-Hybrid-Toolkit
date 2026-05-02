@@ -1,5 +1,5 @@
 # OneDrive-Hybrid-Toolkit
-Production-ready PowerShell toolkit to safely remove/reinstall Microsoft OneDrive
+PowerShell toolkit to safely remove/reinstall Microsoft OneDrive
 # OneDrive Hybrid Toolkit 🧹
 
 [![PowerShell Gallery](https://img.shields.io/powershellgallery/v/OneDriveHybridToolkit?label=PowerShell%20Gallery)](https://www.powershellgallery.com/packages/OneDriveHybridToolkit)
