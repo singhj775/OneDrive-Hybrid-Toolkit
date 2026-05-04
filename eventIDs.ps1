@@ -1,4 +1,3 @@
-﻿#requires -RunAsAdministrator
 <#
 .SYNOPSIS
     All-in-One Event Export: Biometric/Personal Vault, OneDrive Conflicts, Security & System Logs
