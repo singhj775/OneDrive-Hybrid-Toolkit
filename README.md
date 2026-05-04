@@ -21,6 +21,8 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 ```powershell
 # run
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
+
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
 ```
 ---
 
@@ -61,3 +63,26 @@ Show current status
 .\OneDrive-Hybrid-Toolkit.ps1 -Status
 ```
 🔐 Administrator rights required: The script will auto-relaunch as Admin if needed.
+
+
+# OneDrive Hybrid Toolkit
+
+Advanced PowerShell toolkit for repairing, cleaning, uninstalling, and fixing broken or ghost OneDrive installations on Windows.
+
+This tool is designed for deep cleanup scenarios where:
+
+- OneDrive shows in Explorer but cannot be removed
+- Setup.exe does nothing
+- "A newer version is already installed" error appears
+- Ghost installs exist
+- Personal Vault / namespace issues persist
+- Policies block installation
+- Registry corruption prevents reinstall
+
+---
+
+## 🚀 Run Directly (No Download Required)
+
+Run this command in PowerShell:
+
+```powershell
