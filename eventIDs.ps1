@@ -7,6 +7,17 @@
     Run as Administrator to access Security logs.
 #>
 
+# Admin Check (works with irm | iex)
+$IsAdmin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+
+if (-not $IsAdmin) {
+    Write-Host "⛔ This script must be run as Administrator." -ForegroundColor Red
+    Write-Host "Please reopen PowerShell as Administrator and try again." -ForegroundColor Yellow
+    return
+}
+
 param(
     [int]$DaysBack = 30,
     [string]$OutputFolder = "C:\EventExports_$(Get-Date -Format 'yyyyMMdd_HHmm')"
