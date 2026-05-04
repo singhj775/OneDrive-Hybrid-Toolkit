@@ -22,7 +22,7 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 # run
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
 
-powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 | iex"
+powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 -OutFile $env:TEMP\eventIDs.ps1; & $env:TEMP\eventIDs.ps1"
 ```
 ---
 
@@ -65,24 +65,16 @@ Show current status
 🔐 Administrator rights required: The script will auto-relaunch as Admin if needed.
 
 
-# OneDrive Hybrid Toolkit
+# Windows Event Export Toolkit
 
-Advanced PowerShell toolkit for repairing, cleaning, uninstalling, and fixing broken or ghost OneDrive installations on Windows.
+Comprehensive PowerShell tool for exporting:
 
-This tool is designed for deep cleanup scenarios where:
+- 🔐 Biometric & Personal Vault events  
+- ☁️ OneDrive sync conflicts & error codes  
+- 🛡️ Security audit events  
+- 💻 System-level service & driver events  
+- 📂 Internal OneDrive log analysis  
 
-- OneDrive shows in Explorer but cannot be removed
-- Setup.exe does nothing
-- "A newer version is already installed" error appears
-- Ghost installs exist
-- Personal Vault / namespace issues persist
-- Policies block installation
-- Registry corruption prevents reinstall
+Designed for deep diagnostics, incident analysis, and troubleshooting OneDrive / Windows authentication issues.
 
 ---
-
-## 🚀 Run Directly (No Download Required)
-
-Run this command in PowerShell:
-
-```powershell
