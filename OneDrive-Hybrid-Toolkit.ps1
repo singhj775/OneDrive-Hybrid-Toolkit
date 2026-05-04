@@ -1,27 +1,33 @@
 <#
 .SYNOPSIS
-    OneDrive Control Toolkit - Safe Remove/Reinstall
+OneDrive Control Toolkit - Safe Remove/Reinstall
 .DESCRIPTION
-    Consumer-friendly, fully automated or menu-driven OneDrive removal tool.
-    Safe by default. Requires Administrator rights. PowerShell 5.1 compatible.
+Consumer-friendly, fully automated or menu-driven OneDrive removal tool.
+Safe by default. Requires Administrator rights. PowerShell 5.1 compatible.
 .PARAMETER Remove
-    Run OneDrive removal.
+Run OneDrive removal.
 .PARAMETER Reinstall
-    Reinstall OneDrive.
+Reinstall OneDrive.
 .PARAMETER Status
-    Show current OneDrive status.
+Show current OneDrive status.
 .PARAMETER DeepClean
-    Remove leftover configuration folders.
+Remove leftover configuration folders.
 .PARAMETER RemoveMyFiles
-    Delete local OneDrive folder (requires explicit YES confirmation).
+Delete local OneDrive folder (requires explicit YES confirmation).
 .PARAMETER BlockReinstall
-    Block auto-reinstall via registry policy.
+Block auto-reinstall via registry policy.
 .PARAMETER PostRebootCleanup
-    Schedule cleanup of locked files after reboot.
+Schedule cleanup of locked files after reboot.
 .PARAMETER NoPrompt
-    Skip interactive prompts.
+Skip interactive prompts.
+.PARAMETER UnpinNamespace
+Auto-detect Personal OneDrive CLSID and unpin it from Explorer namespace.
+.PARAMETER RestartExplorer
+Restart Windows Explorer after unpinning to refresh the UI.
 .EXAMPLE
-    .\OneDrive-Toolkit-Final.ps1 -Remove -DeepClean
+.\OneDrive-Toolkit-Final.ps1 -Remove -DeepClean
+.EXAMPLE
+.\OneDrive-Toolkit-Final.ps1 -UnpinNamespace -RestartExplorer
 #>
 [CmdletBinding()]
 param(
@@ -33,18 +39,20 @@ param(
     [switch]$RemoveMyFiles,
     [switch]$BlockReinstall,
     [switch]$PostRebootCleanup,
-    [switch]$NoPrompt
+    [switch]$NoPrompt,
+    [switch]$UnpinNamespace,
+    [switch]$RestartExplorer
 )
 
-# ===== Configuration =====
-$ScriptVersion = '2.2.1'
+===== Configuration =====
+$ScriptVersion = '2.3.0'
 $LogDir = Join-Path $env:ProgramData 'OneDriveToolkit'
 $LogPath = Join-Path $LogDir 'Toolkit.log'
 $OneDriveCLSID = '{018D5C66-4533-4307-9B53-224DE2ED1FE6}'
 $PolicyPath = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\OneDrive'
 $TaskName = 'OneDrivePostCleanup'
 
-# ===== Logging Setup =====
+===== Logging Setup =====
 $ErrorActionPreference = 'Continue'
 New-Item -Path $LogDir -ItemType Directory -Force | Out-Null
 Start-Transcript -Path (Join-Path $LogDir "log_$(Get-Date -Format 'yyyyMMdd_HHmmss').txt") -Append -WarningAction SilentlyContinue | Out-Null
@@ -64,7 +72,7 @@ function Write-Log {
     Add-Content -Path $LogPath -Value $line
 }
 
-# ===== Admin Check & Auto-Elevate =====
+===== Admin Check & Auto-Elevate =====
 function Test-Admin {
     $user = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($user)
@@ -83,7 +91,7 @@ if (-not (Test-Admin)) {
     exit
 }
 
-# ===== Stop Processes =====
+===== Stop Processes =====
 function Stop-OneDriveProcs {
     Write-Log "Stopping OneDrive processes..." 'INFO'
     @('OneDrive','FileSyncHelper','Update') | ForEach-Object {
@@ -92,14 +100,14 @@ function Stop-OneDriveProcs {
     Start-Sleep -Seconds 2
 }
 
-# ===== Run Uninstallers (Safe String Parsing) =====
+===== Run Uninstallers (Safe String Parsing) =====
 function Run-Uninstallers {
     Write-Log "Running OneDrive uninstallers..." 'INFO'
     $paths = @(
-        "$env:SystemRoot\System32\OneDriveSetup.exe",
-        "$env:SystemRoot\SysWOW64\OneDriveSetup.exe",
-        "$env:ProgramFiles\Microsoft Office\root\Integration\Addons\OneDriveSetup.exe",
-        "${env:ProgramFiles(x86)}\Microsoft Office\root\Integration\Addons\OneDriveSetup.exe"
+        "$env:SystemRoot\System32\OneDriveSetup.exe ",
+        "$env:SystemRoot\SysWOW64\OneDriveSetup.exe ",
+        "$env:ProgramFiles\Microsoft Office\root\Integration\Addons\OneDriveSetup.exe ",
+        "${env:ProgramFiles(x86)}\Microsoft Office\root\Integration\Addons\OneDriveSetup.exe "
     )
     foreach ($p in $paths) {
         if (Test-Path $p) {
@@ -114,7 +122,7 @@ function Run-Uninstallers {
     $regPaths = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
     foreach ($rp in $regPaths) {
         if (Test-Path $rp) {
-            Get-ChildItem $rp -ErrorAction SilentlyContinue | Where-Object { $_.GetValue('DisplayName') -like '*OneDrive*' } | ForEach-Object {
+            Get-ChildItem $rp -ErrorAction SilentlyContinue | Where-Object { $_.GetValue('DisplayName') -like 'OneDrive*' } | ForEach-Object {
                 $us = $_.GetValue('UninstallString')
                 if ($us) {
                     try {
@@ -143,22 +151,22 @@ function Run-Uninstallers {
     }
 }
 
-# ===== Remove AppX =====
+===== Remove AppX =====
 function Remove-AppX {
     Write-Log "Removing AppX packages..." 'INFO'
     try {
-        Get-AppxPackage -Name '*OneDrive*' -ErrorAction Stop | Remove-AppxPackage -ErrorAction Stop
+        Get-AppxPackage -Name 'OneDrive' -ErrorAction Stop | Remove-AppxPackage -ErrorAction Stop
         Write-Log "User AppX removed" 'SUCCESS'
     } catch { Write-Log "No user AppX found" 'INFO' }
     try {
-        Get-AppxProvisionedPackage -Online -ErrorAction Stop | Where-Object { $_.DisplayName -like '*OneDrive*' } | ForEach-Object {
+        Get-AppxProvisionedPackage -Online -ErrorAction Stop | Where-Object { $_.DisplayName -like 'OneDrive*' } | ForEach-Object {
             Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction Stop
         }
         Write-Log "Provisioned AppX removed" 'SUCCESS'
     } catch { Write-Log "No provisioned AppX found" 'INFO' }
 }
 
-# ===== Registry Cleanup =====
+===== Registry Cleanup =====
 function Clean-Registry {
     Write-Log "Cleaning registry..." 'INFO'
     $keys = @(
@@ -177,7 +185,7 @@ function Clean-Registry {
     }
 }
 
-# ===== Folder Cleanup =====
+===== Folder Cleanup =====
 function Clean-Folders {
     Write-Log "Cleaning folders..." 'INFO'
     $folders = @(
@@ -206,7 +214,69 @@ function Clean-Folders {
     }
 }
 
-# ===== Post-Reboot Task =====
+===== Unpin Namespace =====
+function Unpin-OneDriveNamespace {
+    Write-Log "Scanning NameSpace under HKCU to find Personal OneDrive..." 'INFO'
+    $nsPath = 'HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Desktop\NameSpace'
+    $foundCLSID = $null
+    $foundLabel = $null
+
+    if (Test-Path $nsPath) {
+        $keys = Get-ChildItem -Path $nsPath -ErrorAction SilentlyContinue
+        foreach ($key in $keys) {
+            $defVal = (Get-ItemProperty -Path $key.PSPath -Name '(default)' -ErrorAction SilentlyContinue).'(default)'
+            if ($defVal) {
+                # Match exactly "OneDrive" or "OneDrive - Personal"
+                if ($defVal -eq 'OneDrive' -or $defVal -match '^OneDrive\s+-\s+Personal$') {
+                    $foundCLSID = $key.PSChildName
+                    $foundLabel = $defVal
+                    Write-Log "Candidate found: $foundLabel => CLSID={$foundCLSID}" 'INFO'
+                    break
+                } else {
+                    Write-Log "Skipping NameSpace: $defVal ($($key.PSChildName))" 'INFO'
+                }
+            }
+        }
+    }
+
+    if (-not $foundCLSID) {
+        Write-Log "ERROR: No Personal OneDrive NameSpace entry found." 'ERROR'
+        Write-Log "HINT: Ensure Personal OneDrive is enabled in Explorer." 'WARN'
+        return
+    }
+
+    $targetPath = "Registry::HKEY_CLASSES_ROOT\CLSID\$foundCLSID"
+    Write-Log "Using: $foundLabel  CLSID={$foundCLSID}" 'INFO'
+    Write-Log "Target: $targetPath\System.IsPinnedToNameSpaceTree -> 0 (DWORD)" 'INFO'
+
+    if (-not (Test-Path $targetPath)) {
+        Write-Log "ERROR: Target CLSID does not exist in HKCR." 'ERROR'
+        return
+    }
+
+    # Set value
+    try {
+        New-ItemProperty -Path $targetPath -Name 'System.IsPinnedToNameSpaceTree' -Value 0 -PropertyType DWord -Force -ErrorAction Stop | Out-Null
+        Write-Log "SUCCESS: System.IsPinnedToNameSpaceTree set to 0." 'SUCCESS'
+    } catch {
+        Write-Log "ERROR: Failed to set registry value: $_" 'ERROR'
+        return
+    }
+
+    # Verify
+    $verify = Get-ItemProperty -Path $targetPath -Name 'System.IsPinnedToNameSpaceTree' -ErrorAction SilentlyContinue
+    Write-Log "VERIFY: New data = $($verify.'System.IsPinnedToNameSpaceTree')" 'INFO'
+
+    if ($RestartExplorer) {
+        Write-Log "Restarting Explorer to refresh namespace tree..." 'INFO'
+        Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Start-Process explorer.exe
+        Write-Log "Explorer restarted." 'INFO'
+    }
+}
+
+===== Post-Reboot Task =====
 function New-PostRebootTask {
     Write-Log "Creating post-reboot cleanup task..." 'INFO'
     try {
@@ -219,7 +289,7 @@ function New-PostRebootTask {
     } catch { Write-Log "Failed to create task: $_" 'ERROR' }
 }
 
-# ===== Policy Management =====
+===== Policy Management =====
 function Set-Policy {
     param([bool]$Block)
     if ($Block) {
@@ -234,10 +304,9 @@ function Set-Policy {
     }
 }
 
-# ===== Status Check =====
+===== Status Check =====
 function Get-Status {
-    Write-Host ""
-    Write-Host "OneDrive Status" -ForegroundColor Cyan
+    Write-Host "`nOneDrive Status " -ForegroundColor Cyan
     Write-Host "----------------" -ForegroundColor DarkGray
     $inst32 = Test-Path "$env:SystemRoot\System32\OneDriveSetup.exe"
     $blocked = Test-Path $PolicyPath
@@ -248,11 +317,10 @@ function Get-Status {
     Write-Host ""
 }
 
-# ===== Confirmation =====
+===== Confirmation =====
 function Confirm-DeleteFiles {
     if ($RemoveMyFiles) {
-        Write-Host ""
-        Write-Host "WARNING: Delete personal OneDrive folder?" -ForegroundColor Red
+        Write-Host "`nWARNING: Delete personal OneDrive folder?" -ForegroundColor Red
         Write-Host "Path: $env:USERPROFILE\OneDrive" -ForegroundColor Yellow
         Write-Host "Type YES to confirm" -ForegroundColor Yellow
         $c = Read-Host ""
@@ -262,7 +330,7 @@ function Confirm-DeleteFiles {
     return $true
 }
 
-# ===== Main Removal =====
+===== Main Removal =====
 function Do-Remove {
     if (-not (Confirm-DeleteFiles)) { Write-Host "Cancelled. Files safe." -ForegroundColor Green; return }
     Stop-OneDriveProcs
@@ -275,7 +343,7 @@ function Do-Remove {
     Write-Log "Removal Complete" 'SUCCESS'
 }
 
-# ===== Reinstall =====
+===== Reinstall =====
 function Do-Reinstall {
     Write-Log "Reinstalling OneDrive..." 'INFO'
     if ($BlockReinstall) { Set-Policy -Block $false }
@@ -284,11 +352,10 @@ function Do-Reinstall {
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 }
 
-# ===== Menu =====
+===== Menu =====
 function Show-Menu {
     Clear-Host
-    Write-Host ""
-    Write-Host "OneDrive Toolkit v$ScriptVersion" -ForegroundColor Cyan
+    Write-Host "`nOneDrive Toolkit v$ScriptVersion" -ForegroundColor Cyan
     Write-Host "=================================" -ForegroundColor DarkGray
     Get-Status
     Write-Host "Options:" -ForegroundColor Yellow
@@ -297,40 +364,40 @@ function Show-Menu {
     Write-Host "3. Remove + Delete My Files"
     Write-Host "4. Reinstall OneDrive"
     Write-Host "5. Block Reinstall (Policy)"
-    Write-Host "6. Exit"
+    Write-Host "6. Unpin OneDrive from Explorer Namespace"
+    Write-Host "7. Exit"
     Write-Host ""
 }
 
 function Run-Menu {
     do {
         Show-Menu
-        $c = Read-Host "Select 1-6"
+        $c = Read-Host "Select 1-7"
         switch ($c) {
             '1' { Do-Remove; Pause }
             '2' { $script:DeepClean=$true; Do-Remove; Pause }
             '3' { $script:DeepClean=$true; $script:RemoveMyFiles=$true; Do-Remove; Pause }
             '4' { Do-Reinstall; Pause }
             '5' { Set-Policy -Block $true; Pause }
-            '6' { Write-Host "Exiting"; return }
+            '6' { Unpin-OneDriveNamespace -RestartExplorer:$RestartExplorer; Pause }
+            '7' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
 }
 
-# ===== Main Entry =====
+===== Main Entry =====
 Write-Log "Toolkit Started" 'INFO'
-
 if ($Status) { Get-Status; if (-not $NoPrompt) { Pause }; exit }
 if ($Remove) { Do-Remove }
 elseif ($Reinstall) { Do-Reinstall }
+elseif ($UnpinNamespace) { Unpin-OneDriveNamespace -RestartExplorer:$RestartExplorer }
 elseif ($Menu -or $PSBoundParameters.Count -eq 0) { Run-Menu }
 
 if (-not $NoPrompt) {
-    Write-Host ""
-    Write-Host "Reboot recommended." -ForegroundColor Cyan
+    Write-Host "`nReboot recommended." -ForegroundColor Cyan
     $ans = Read-Host "Restart now? (Y/N)"
     if ($ans -ieq 'y' -or $ans -ieq 'yes') { Restart-Computer -Force }
 }
-
 Stop-Transcript | Out-Null
 Write-Host "Log: $LogPath" -ForegroundColor Cyan
