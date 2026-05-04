@@ -23,6 +23,8 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
 
 powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 -OutFile $env:TEMP\eventIDs.ps1; & $env:TEMP\eventIDs.ps1"
+
+powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 -OutFile $env:TEMP\eventIDs.ps1; & $env:TEMP\eventIDs.ps1"
 ```
 ---
 
@@ -78,3 +80,18 @@ Comprehensive PowerShell tool for exporting:
 Designed for deep diagnostics, incident analysis, and troubleshooting OneDrive / Windows authentication issues.
 
 ---
+
+# Windows Event & OneDrive Diagnostic Export Tool
+
+A comprehensive PowerShell diagnostic script that exports:
+
+- 🔐 Biometric & Personal Vault events  
+- ☁️ OneDrive sync conflicts & error codes  
+- 🛡️ Security audit events  
+- 💻 System service & driver events  
+- 📂 Internal OneDrive log analysis  
+
+Designed for troubleshooting, audit analysis, and deep diagnostics of Windows authentication and OneDrive issues.
+
+---
+
