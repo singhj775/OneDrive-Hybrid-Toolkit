@@ -23,6 +23,17 @@ param(
     [string]$OutputFolder = "C:\EventExports_$(Get-Date -Format 'yyyyMMdd_HHmm')"
 )
 
+# Admin Check (works with irm | iex)
+$IsAdmin = ([Security.Principal.WindowsPrincipal] `
+    [Security.Principal.WindowsIdentity]::GetCurrent()
+).IsInRole([Security.Principal.WindowsBuiltinRole]::Administrator)
+
+if (-not $IsAdmin) {
+    Write-Host "⛔ This script must be run as Administrator." -ForegroundColor Red
+    Write-Host "Please reopen PowerShell as Administrator and try again." -ForegroundColor Yellow
+    return
+}
+
 # === SETUP ===
 if (!(Test-Path $OutputFolder)) { New-Item -Path $OutputFolder -ItemType Directory -Force | Out-Null }
 $StartTime = (Get-Date).AddDays(-$DaysBack)
