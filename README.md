@@ -22,6 +22,8 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 # run
 powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 | iex"
 
+powershell -ExecutionPolicy Bypass -NoProfile -Command "irm https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 | iex"
+
 powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/eventIDs.ps1 -OutFile $env:TEMP\eventIDs.ps1; & $env:TEMP\eventIDs.ps1"
 
 powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/Network_analyze.ps1 -OutFile $env:TEMP\Network_analyze.ps1; & $env:TEMP\Network_analyze.ps1"
