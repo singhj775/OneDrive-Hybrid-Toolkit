@@ -32,8 +32,10 @@ param(
     [switch]$DeepClean,
     [switch]$RemoveMyFiles,
     [switch]$BlockReinstall,
+    [switch]$RealTimeDiagnostic,
     [switch]$PostRebootCleanup,
     [switch]$NoPrompt
+
 )
 
 # ===== Configuration =====
@@ -282,6 +284,130 @@ function Do-Reinstall {
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 }
 
+# ================================
+# HEALTH SCORE
+# ================================
+
+function Get-HealthScore {
+
+    $score = 100
+
+    if (-not (Get-Process OneDrive -ErrorAction SilentlyContinue)) { $score -= 20 }
+    if (-not (Test-Path "$env:LOCALAPPDATA\Microsoft\OneDrive")) { $score -= 20 }
+    if (Test-Path "HKLM:\Software\Policies\Microsoft\Windows\OneDrive") { $score -= 20 }
+    if (-not (Test-Connection 8.8.8.8 -Quiet -Count 1)) { $score -= 20 }
+    if (-not (Test-Path "$env:USERPROFILE\OneDrive")) { $score -= 20 }
+
+    return $score
+}
+
+
+
+
+# ===== Monitoring =====
+
+function RealTimeDiagnostic {
+
+    Write-Title "OneDrive Live Performance Monitor"
+
+    $SampleInterval = 3
+    $CpuThreshold = 70
+    $SpikeDuration = 15
+    $LogicalCPU = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
+    $HighCpuTime = 0
+
+    while ($true) {
+
+        $p1 = Get-Process OneDrive -ErrorAction SilentlyContinue
+
+        if (-not $p1) {
+            Clear-Host
+            Write-Host "Status: NOT RUNNING" -ForegroundColor Red
+            Start-Sleep $SampleInterval
+            continue
+        }
+
+        $cpu1 = ($p1 | Measure-Object CPU -Sum).Sum
+        Start-Sleep $SampleInterval
+
+        $p2 = Get-Process OneDrive -ErrorAction SilentlyContinue
+        if (-not $p2) { continue }
+
+        $cpu2 = ($p2 | Measure-Object CPU -Sum).Sum
+        $mem  = ($p2 | Measure-Object WorkingSet64 -Sum).Sum
+
+        $cpuPercent = ((($cpu2 - $cpu1) / $SampleInterval) / $LogicalCPU) * 100
+        $cpuPercent = [math]::Round($cpuPercent,2)
+
+        # ----- CPU BAR GRAPH -----
+        $barLength = 30
+        $filled = [math]::Round(($cpuPercent / 100) * $barLength)
+
+        if ($filled -gt $barLength) { $filled = $barLength }
+        if ($filled -lt 0) { $filled = 0 }
+
+        $bar = ("#" * $filled).PadRight($barLength,"-")
+
+        # ----- Color Logic -----
+        if ($cpuPercent -lt 50) {
+            $cpuColor = "Green"
+        }
+        elseif ($cpuPercent -lt 70) {
+            $cpuColor = "Yellow"
+        }
+        else {
+            $cpuColor = "Red"
+        }
+
+        # ----- Screen Render -----
+        Clear-Host
+
+        Write-Host "Time: $(Get-Date -Format HH:mm:ss)"
+        Write-Host "Health Score: $(Get-HealthScore)/100"
+        Write-Host ""
+
+        Write-Host ("CPU: {0} %" -f $cpuPercent) -ForegroundColor $cpuColor
+        Write-Host "[$bar]" -ForegroundColor $cpuColor
+        Write-Host ""
+
+        Write-Host ("Memory: {0} MB" -f [math]::Round($mem / 1MB,2))
+        Write-Host "Processes: $($p2.Count)"
+        Write-Host "Status: RUNNING" -ForegroundColor Green
+
+        # ----- AUTO HEAL ENGINE -----
+        if ($cpuPercent -gt $CpuThreshold) {
+
+            $HighCpuTime += $SampleInterval
+
+            if ($HighCpuTime -ge $SpikeDuration) {
+
+                Write-Host ""
+                Write-Host "[AUTO-HEAL] High CPU sustained. Restarting OneDrive..." -ForegroundColor Cyan
+
+                try {
+                    Get-Process OneDrive -ErrorAction SilentlyContinue | Stop-Process -Force
+                    Start-Sleep 3
+
+                    $odPath = "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe"
+                    if (Test-Path $odPath) {
+                        Start-Process $odPath
+                        Write-Host "Restart successful." -ForegroundColor Green
+                    }
+                }
+                catch {
+                    Write-Host "Auto-heal failed." -ForegroundColor Red
+                }
+
+                $HighCpuTime = 0
+                Start-Sleep 3
+            }
+        }
+        else {
+            $HighCpuTime = 0
+        }
+    }
+}
+
 # ===== Menu =====
 function Show-Menu {
     Clear-Host
@@ -294,21 +420,23 @@ function Show-Menu {
     Write-Host "3. Remove + Delete My Files"
     Write-Host "4. Reinstall OneDrive"
     Write-Host "5. Block Reinstall (Policy)"
-    Write-Host "6. Exit"
+    Write-Host "6. RealTimeDiagnostic"
+    Write-Host "7. Exit"
     Write-Host ""
 }
 
 function Run-Menu {
     do {
         Show-Menu
-        $c = Read-Host "Select 1-6"
+        $c = Read-Host "Select 1-7"
         switch ($c) {
             '1' { Do-Remove; Pause }
             '2' { $script:DeepClean=$true; Do-Remove; Pause }
             '3' { $script:DeepClean=$true; $script:RemoveMyFiles=$true; Do-Remove; Pause }
             '4' { Do-Reinstall; Pause }
             '5' { Set-Policy -Block $true; Pause }
-            '6' { Write-Host "Exiting"; return }
+	    '6' { RealTimeDiagnostic }
+            '7' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
