@@ -34,6 +34,7 @@ param(
     [switch]$BlockReinstall,
     [switch]$RealTimeDiagnostic,
     [switch]$PostRebootCleanup,
+    [switch]$ChracterCount,
     [switch]$NoPrompt
 
 )
@@ -284,6 +285,50 @@ function Do-Reinstall {
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 }
 
+# ===== Chracter Count =====
+function ChracterCount {
+# Detect current user profile and OneDrive path
+$UserProfile = $env:USERPROFILE
+$BaseFolder  = Join-Path $UserProfile "OneDrive"
+$OutputCsv   = Join-Path $BaseFolder "CharacterCountResults.csv"
+
+$results = @()
+
+# Get all folders
+Get-ChildItem -Path $BaseFolder -Recurse -Directory | ForEach-Object {
+    $folderName      = $_.Name
+    $folderCharCount = $folderName.Length
+    $fullPathLength  = $_.FullName.Length
+    $results += [PSCustomObject]@{
+        Type           = "Folder"
+        Path           = $_.FullName
+        NameCharCount  = $folderCharCount
+        FullPathLength = $fullPathLength
+    }
+}
+
+# Get all files
+Get-ChildItem -Path $BaseFolder -Recurse -File | ForEach-Object {
+    $fileName        = $_.Name
+    $fileCharCount   = $fileName.Length
+    $fullPathLength  = $_.FullName.Length
+    $results += [PSCustomObject]@{
+        Type           = "File"
+        Path           = $_.FullName
+        NameCharCount  = $fileCharCount
+        FullPathLength = $fullPathLength
+    }
+}
+
+# Export to CSV
+$results | Export-Csv -Path $OutputCsv -NoTypeInformation -Encoding UTF8
+
+Write-Host "Scan complete. Results saved to $OutputCsv"
+
+}
+
+
+
 # ================================
 # HEALTH SCORE
 # ================================
@@ -421,7 +466,8 @@ function Show-Menu {
     Write-Host "4. Reinstall OneDrive"
     Write-Host "5. Block Reinstall (Policy)"
     Write-Host "6. RealTimeDiagnostic"
-    Write-Host "7. Exit"
+    Write-Host "7. ChracterCount"
+    Write-Host "8. Exit"
     Write-Host ""
 }
 
@@ -436,7 +482,8 @@ function Run-Menu {
             '4' { Do-Reinstall; Pause }
             '5' { Set-Policy -Block $true; Pause }
 	    '6' { RealTimeDiagnostic }
-            '7' { Write-Host "Exiting"; return }
+            '7' { ChracterCount; Pause }
+            '8' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
