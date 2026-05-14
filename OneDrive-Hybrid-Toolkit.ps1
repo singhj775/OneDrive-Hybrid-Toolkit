@@ -35,6 +35,8 @@ param(
     [switch]$RealTimeDiagnostic,
     [switch]$PostRebootCleanup,
     [switch]$ChracterCount,
+    [switch]$LocalAccount,
+    [switch]$LogsCollection,
     [switch]$NoPrompt
 
 )
@@ -178,6 +180,15 @@ function Clean-Registry {
             catch { Write-Log "Could not remove: $k" 'WARN' }
         }
     }
+    Write-Log "Removing Broken Identity Cache..." 'INFO'
+
+	Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+
+Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
+Write-Log "Removed Broken Identity Cache..." 'INFO'
+
 }
 
 # ===== Folder Cleanup =====
@@ -283,6 +294,137 @@ function Do-Reinstall {
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
     if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
+}
+
+# ===== Logs Collection =====
+function logsCollection {
+		try {
+    $TimeStamp  = Get-Date -Format "yyyyMMdd_HHmmss"
+    $TempRoot   = Join-Path $env:TEMP "OneDrive_Log_Collection_$TimeStamp"
+    $ZipFile    = Join-Path $env:TEMP "OneDrive_Logs_$TimeStamp.zip"
+    $ReportFile = Join-Path $TempRoot "Summary_Report.txt"
+
+    New-Item -Path $TempRoot -ItemType Directory -Force | Out-Null
+    Write-Host "Created temp collection folder: $TempRoot" -ForegroundColor Cyan
+
+    # =========================
+    # Collect System Info
+    # =========================
+    Write-Host "Collecting system information..." -ForegroundColor Cyan
+    $OS = Get-CimInstance Win32_OperatingSystem -ErrorAction Stop
+    $OneDriveExe = "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe"
+    $ODVersion = if (Test-Path $OneDriveExe) { (Get-Item $OneDriveExe).VersionInfo.FileVersion } else { "Not Found" }
+
+    @"
+===== SYSTEM INFORMATION =====
+Date: $(Get-Date)
+Computer Name: $env:COMPUTERNAME
+User: $env:USERNAME
+OS: $($OS.Caption)
+Version: $($OS.Version)
+Build: $($OS.BuildNumber)
+OneDrive Version: $ODVersion
+
+"@ | Out-File -FilePath $ReportFile -Encoding UTF8 -Force
+
+    # =========================
+    # Known Log Paths
+    # =========================
+    Write-Host "Collecting OneDrive logs..." -ForegroundColor Cyan
+    $LogPaths = @(
+        "$env:LOCALAPPDATA\Microsoft\OneDrive",
+        "$env:LOCALAPPDATA\Microsoft\OneDrive\logs",
+        "$env:LOCALAPPDATA\Microsoft\OneDrive\setup\logs",
+        "$env:LOCALAPPDATA\Microsoft\OneDrive\StandaloneUpdater\logs",
+        "$env:PROGRAMDATA\Microsoft OneDrive\logs"
+    )
+
+    $AllLogs = @()
+    foreach ($Path in $LogPaths) {
+        if (Test-Path $Path) {
+            $Destination = Join-Path $TempRoot (Split-Path $Path -Leaf)
+            New-Item -Path $Destination -ItemType Directory -Force | Out-Null
+
+            $Files = Get-ChildItem -Path $Path -Recurse -File -ErrorAction SilentlyContinue
+            $Files | Copy-Item -Destination $Destination -Force -ErrorAction SilentlyContinue
+            $AllLogs += $Files
+        }
+    }
+
+    if ($AllLogs.Count -eq 0) {
+        Write-Warning "No OneDrive log files found. Check if OneDrive is installed and running."
+        Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+        return
+    }
+    Write-Host "Found $($AllLogs.Count) log files." -ForegroundColor Green
+
+    # =========================
+    # Parse Common Issues
+    # =========================
+    Write-Host "Analyzing logs for common sync issues..." -ForegroundColor Cyan
+    $Patterns = @{
+        "Access Denied"        = "access denied"
+        "File In Use"          = "in use"
+        "Upload Blocked"       = "upload blocked"
+        "Disk Full"            = "disk full"
+        "Authentication Error" = "auth"
+        "Quota Exceeded"       = "quota"
+        "Network Error"        = "network"
+        "Sync Paused"          = "paused"
+        "Invalid Filename"     = "invalid"
+        "SharePoint Error"     = "sharepoint"
+    }
+
+    "===== COMMON ISSUE ANALYSIS =====" | Add-Content -Path $ReportFile
+    foreach ($Issue in $Patterns.Keys) {
+        $Count = 0
+        foreach ($Log in $AllLogs) {
+            try {
+                $Count += (Select-String -Path $Log.FullName -Pattern $Patterns[$Issue] -SimpleMatch -ErrorAction SilentlyContinue).Count
+            } catch { $null }
+        }
+        "$Issue : $Count occurrences" | Add-Content -Path $ReportFile
+    }
+    "`n===== END OF REPORT =====" | Add-Content -Path $ReportFile
+
+    # =========================
+    # Compress Everything
+    # =========================
+    Write-Host "🗜️ Compressing logs and report..." -ForegroundColor Cyan
+    if (Test-Path $ZipFile) { Remove-Item $ZipFile -Force }
+
+    Compress-Archive -Path "$TempRoot\*" -DestinationPath $ZipFile -Force
+
+    # Cleanup temp folder
+    Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+
+    Write-Host "Collection Complete!" -ForegroundColor Green
+    Write-Host "ZIP File: $ZipFile" -ForegroundColor White
+    Write-Host "Attach this file to your support ticket." -ForegroundColor Gray
+}
+catch {
+    Write-Error "Script failed: $_"
+    if (Test-Path $TempRoot) {
+        Remove-Item -Path $TempRoot -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+}
+
+
+
+# ===== Local User Account =====
+function NewLocalUserAccount {
+        Write-Log "Creating account..." 'INFO'
+   # Create new local user account with password
+	net user test tet123 /add
+
+# Add the user to Administrators group
+	net localgroup Administrators test /add
+
+        Write-Log "account created..." 'INFO'
+
+
 }
 
 # ===== Chracter Count =====
@@ -467,7 +609,9 @@ function Show-Menu {
     Write-Host "5. Block Reinstall (Policy)"
     Write-Host "6. RealTimeDiagnostic"
     Write-Host "7. ChracterCount"
-    Write-Host "8. Exit"
+    Write-Host "8. New Local User Account"
+    Write-Host "9. Logs Collection"
+    Write-Host "10. Exit"
     Write-Host ""
 }
 
@@ -483,7 +627,9 @@ function Run-Menu {
             '5' { Set-Policy -Block $true; Pause }
 	    '6' { RealTimeDiagnostic }
             '7' { ChracterCount; Pause }
-            '8' { Write-Host "Exiting"; return }
+	    '8' { NewLocalUserAccount; Pause }
+	    '9' { LogsCollection; Pause }
+            '10' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
