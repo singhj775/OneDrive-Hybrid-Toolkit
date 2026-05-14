@@ -618,7 +618,7 @@ function Show-Menu {
 function Run-Menu {
     do {
         Show-Menu
-        $c = Read-Host "Select 1-7"
+        $c = Read-Host "Select 1-10"
         switch ($c) {
             '1' { Do-Remove; Pause }
             '2' { $script:DeepClean=$true; Do-Remove; Pause }
