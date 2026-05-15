@@ -98,3 +98,10 @@ Designed for troubleshooting, audit analysis, and deep diagnostics of Windows au
 
 ---
 
+## 🛠 What This crosslink extension Script Does
+
+- Scans files
+- Detects real file type using TrID
+- Suggests correct extension
+- Helps fix ransomware-crosslinked extensions
+
