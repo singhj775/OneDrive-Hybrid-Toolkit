@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Fully silent TrID automation. Checks for system Python first.
-    If missing, installs embedded Python, fixes BOM crash, runs trid.py.
+    Fully silent TrID automation with real-time progress bar.
+    Prompts for target directory if run manually, accepts -TargetDir for automation.
 #>
 [CmdletBinding()]
 param(
-    [string]$TargetDir = "C:\Users\singh\OneDrive\Documents\test",
+    [string]$TargetDir = "",
     [string]$OutputCsv = "results.csv",
     [switch]$Force,
     [switch]$HideConsole
@@ -33,7 +33,27 @@ function Write-Log {
 
 Write-Log "=== TrID Python Automation Started ===" "INFO"
 
-# ==================== 1. FIND OR INSTALL PYTHON ====================
+# ==================== 1. INTERACTIVE INPUT / VALIDATION ====================
+if ([string]::IsNullOrWhiteSpace($TargetDir)) {
+    if ($HideConsole) {
+        Write-Log "ERROR: -TargetDir parameter is required when running silently or via Task Scheduler." "ERROR"
+        exit 1
+    }
+    Write-Host "`n[TrID Auto] Please enter the target directory path:" -ForegroundColor Cyan
+    $TargetDir = Read-Host ">> Target Directory"
+    if ([string]::IsNullOrWhiteSpace($TargetDir)) {
+        Write-Log "ERROR: No directory provided. Exiting." "ERROR"
+        exit 1
+    }
+}
+
+$TargetDir = $TargetDir.Trim('"').Trim()
+try { $TargetDir = [System.IO.Path]::GetFullPath($TargetDir) } catch { Write-Log "ERROR: Invalid path format." "ERROR"; exit 1 }
+
+if (-not (Test-Path $TargetDir -PathType Container)) { Write-Log "ERROR: Target directory not found: $TargetDir" "ERROR"; exit 1 }
+Write-Log "Target directory resolved to: $TargetDir" "INFO"
+
+# ==================== 2. FIND OR INSTALL PYTHON ====================
 function Find-SystemPython {
     $cmds = @("python", "python3", "py")
     foreach ($c in $cmds) {
@@ -47,12 +67,9 @@ function Find-SystemPython {
 }
 
 $PythonExe = Find-SystemPython
-$UseEmbedded = $false
-
 if ($PythonExe -and -not $Force) {
     Write-Log "System Python found: $PythonExe" "INFO"
 } else {
-    $UseEmbedded = $true
     $PythonDir = Join-Path $ScriptDir "Python"
     $PythonExe = Join-Path $PythonDir "python.exe"
     
@@ -68,26 +85,18 @@ if ($PythonExe -and -not $Force) {
             Expand-Archive -Path $PyZip -DestinationPath $PythonDir -Force
             Remove-Item $PyZip -Force -ErrorAction SilentlyContinue
 
-            # CRITICAL BOM FIX: Overwrite .pth with clean, BOM-free content
             $PthPath = Join-Path $PythonDir "python312._pth"
             $CleanPth = "python312.zip`n.`n#import site"
             [System.IO.File]::WriteAllText($PthPath, $CleanPth, (New-Object System.Text.UTF8Encoding $false))
-            Write-Log "python312._pth configured (BOM removed, site enabled)." "INFO"
-
-            # Verify Python actually boots
+            
             $test = & $PythonExe -c "import encodings; print('BOOT_OK')" 2>&1
             if ($test -notmatch "BOOT_OK") { throw "Embedded Python failed verification: $test" }
             Write-Log "Embedded Python verified successfully." "SUCCESS"
-        } catch {
-            Write-Log "Embedded Python setup failed: $_" "ERROR"
-            exit 1
-        }
-    } else {
-        Write-Log "Embedded Python already present." "INFO"
-    }
+        } catch { Write-Log "Embedded Python setup failed: $_" "ERROR"; exit 1 }
+    } else { Write-Log "Embedded Python already present." "INFO" }
 }
 
-# ==================== 2. DOWNLOAD TRID.PY & DEFINITIONS ====================
+# ==================== 3. DOWNLOAD TRID.PY & DEFINITIONS ====================
 $TridPyPath = Join-Path $ScriptDir "trid.py"
 $DefsZipUrl = "https://mark0.net/download/triddefs.zip"
 $DefsZipPath = Join-Path $ScriptDir "triddefs.zip"
@@ -109,9 +118,7 @@ if ($Force -or -not (Test-Path $DefsPath)) {
     } catch { Write-Log "Defs download failed: $_" "ERROR"; exit 1 }
 } else { Write-Log "Definitions already present." "INFO" }
 
-# ==================== 3. VALIDATE & EXECUTE ====================
-if (-not (Test-Path $TargetDir)) { Write-Log "ERROR: Target directory not found: $TargetDir" "ERROR"; exit 1 }
-
+# ==================== 4. EXECUTE TRID WITH PROGRESS BAR ====================
 $OutputPath = Join-Path $ScriptDir $OutputCsv
 Write-Log "Target: $TargetDir | Output: $OutputPath" "INFO"
 
@@ -129,12 +136,48 @@ $psi.UseShellExecute = $false
 $psi.CreateNoWindow = $true
 
 $proc = [System.Diagnostics.Process]::Start($psi)
-$stdout = $proc.StandardOutput.ReadToEnd()
-$stderr = $proc.StandardError.ReadToEnd()
-$proc.WaitForExit()
+$outReader = $proc.StandardOutput
+$errReader = $proc.StandardError
+$stdoutLog = [System.Text.StringBuilder]::new()
+$stderrLog = [System.Text.StringBuilder]::new()
+$fileCount = 0
 
-if ($stdout) { Write-Log "Python Output: $($stdout.Trim())" "INFO" }
-if ($stderr) { Write-Log "Python Error: $($stderr.Trim())" "WARN" }
+# Real-time output reading + Progress Bar
+while (-not $proc.HasExited) {
+    try {
+        if ($outReader.Peek() -ge 0) {
+            $line = $outReader.ReadLine()
+            if ($line) {
+                $stdoutLog.AppendLine($line) | Out-Null
+                $fileCount++
+                # Update progress when trid.py outputs a file path
+                if (-not $HideConsole -and $line -match "File:\s+(.+)") {
+                    Write-Progress -Activity "TrID Extension Correction" `
+                                   -Status "Analyzing: $($Matches[1])" `
+                                   -CurrentOperation "Files processed: $fileCount"
+                }
+            }
+        }
+        if ($errReader.Peek() -ge 0) {
+            $errLine = $errReader.ReadLine()
+            if ($errLine) { $stderrLog.AppendLine($errLine) | Out-Null }
+        }
+    } catch { break } # Stream closed
+    Start-Sleep -Milliseconds 50
+}
+
+# Flush remaining output after process exits
+while (($line = $outReader.ReadLine()) -ne $null) { $stdoutLog.AppendLine($line) | Out-Null }
+while (($errLine = $errReader.ReadLine()) -ne $null) { $stderrLog.AppendLine($errLine) | Out-Null }
+
+# Complete progress bar
+if (-not $HideConsole) { Write-Progress -Activity "TrID Extension Correction" -Completed }
+
+$stdout = $stdoutLog.ToString().Trim()
+$stderr = $stderrLog.ToString().Trim()
+
+if ($stdout) { Write-Log "Python Output: $stdout" "INFO" }
+if ($stderr) { Write-Log "Python Error: $stderr" "WARN" }
 
 if ($proc.ExitCode -eq 0) {
     Write-Log "SUCCESS: Extension correction complete. Results: $OutputPath" "SUCCESS"
