@@ -1,22 +1,6 @@
 #!/usr/bin/env python3
 
 #--------------------------------------------------------------------------
-# TrID
-# Copyright (C) 2003-2026 Marco Pontello - https://mark0.net
-#
-# This program is dual-licensed.
-#
-# For personal or non-commercial use, TrID is free software, 
-# licensed under the GNU AGPLv3. See: <http://www.gnu.org/licenses/>
-#
-# For commercial use, a separate license is needed.
-# Commercial use includes any use for profit, business-related
-# activities, or by for-profit entities.
-# Contact the author at: marcopon@gmail.com
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
 #--------------------------------------------------------------------------
 
 
