@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Fully silent TrID automation. Fixes Windows Store Python alias crash.
+    Fully silent TrID automation with real-time progress bar.
     Prompts for target directory if run manually, accepts -TargetDir for automation.
 #>
 [CmdletBinding()]
@@ -39,7 +39,7 @@ if ([string]::IsNullOrWhiteSpace($TargetDir)) {
         Write-Log "ERROR: -TargetDir parameter is required when running silently or via Task Scheduler." "ERROR"
         exit 1
     }
-    Write-Host "`n[Juni] Please enter the target directory path:" -ForegroundColor Cyan
+    Write-Host "`n[TrID Auto] Please enter the target directory path:" -ForegroundColor Cyan
     $TargetDir = Read-Host ">> Target Directory"
     if ([string]::IsNullOrWhiteSpace($TargetDir)) {
         Write-Log "ERROR: No directory provided. Exiting." "ERROR"
@@ -53,27 +53,14 @@ try { $TargetDir = [System.IO.Path]::GetFullPath($TargetDir) } catch { Write-Log
 if (-not (Test-Path $TargetDir -PathType Container)) { Write-Log "ERROR: Target directory not found: $TargetDir" "ERROR"; exit 1 }
 Write-Log "Target directory resolved to: $TargetDir" "INFO"
 
-# ==================== 2. FIND OR INSTALL PYTHON (FIXED) ====================
+# ==================== 2. FIND OR INSTALL PYTHON ====================
 function Find-SystemPython {
-    # Check py.exe first (Python Launcher), then python3, then python
-    $cmds = @("py", "python3", "python")
+    $cmds = @("python", "python3", "py")
     foreach ($c in $cmds) {
         $found = Get-Command $c -ErrorAction SilentlyContinue
-        if (-not $found) { continue }
-
-        # CRITICAL FIX: Skip Windows Store App Execution Aliases
-        if ($found.Source -match "WindowsApps") { continue }
-
-        try {
-            $verOutput = & $found.Source --version 2>&1
-            # Verify it actually returns a valid Python version string
-            if ($LASTEXITCODE -eq 0 -and $verOutput -match "Python \d+\.\d+") {
-                Write-Log "Valid system Python found at: $($found.Source)" "INFO"
-                return $found.Source
-            }
-        } catch {
-            # Ignore broken paths or non-functional stubs
-            continue
+        if ($found) {
+            $ver = & $found.Source --version 2>&1
+            if ($ver -match "Python \d+\.\d+") { return $found.Source }
         }
     }
     return $null
@@ -81,7 +68,7 @@ function Find-SystemPython {
 
 $PythonExe = Find-SystemPython
 if ($PythonExe -and -not $Force) {
-    Write-Log "Using system Python." "INFO"
+    Write-Log "System Python found: $PythonExe" "INFO"
 } else {
     $PythonDir = Join-Path $ScriptDir "Python"
     $PythonExe = Join-Path $PythonDir "python.exe"
@@ -98,7 +85,6 @@ if ($PythonExe -and -not $Force) {
             Expand-Archive -Path $PyZip -DestinationPath $PythonDir -Force
             Remove-Item $PyZip -Force -ErrorAction SilentlyContinue
 
-            # BOM FIX: Overwrite .pth with clean, BOM-free content
             $PthPath = Join-Path $PythonDir "python312._pth"
             $CleanPth = "python312.zip`n.`n#import site"
             [System.IO.File]::WriteAllText($PthPath, $CleanPth, (New-Object System.Text.UTF8Encoding $false))
@@ -164,6 +150,7 @@ while (-not $proc.HasExited) {
             if ($line) {
                 $stdoutLog.AppendLine($line) | Out-Null
                 $fileCount++
+                # Update progress when trid.py outputs a file path
                 if (-not $HideConsole -and $line -match "File:\s+(.+)") {
                     Write-Progress -Activity "TrID Extension Correction" `
                                    -Status "Analyzing: $($Matches[1])" `
@@ -175,13 +162,15 @@ while (-not $proc.HasExited) {
             $errLine = $errReader.ReadLine()
             if ($errLine) { $stderrLog.AppendLine($errLine) | Out-Null }
         }
-    } catch { break }
+    } catch { break } # Stream closed
     Start-Sleep -Milliseconds 50
 }
 
+# Flush remaining output after process exits
 while (($line = $outReader.ReadLine()) -ne $null) { $stdoutLog.AppendLine($line) | Out-Null }
 while (($errLine = $errReader.ReadLine()) -ne $null) { $stderrLog.AppendLine($errLine) | Out-Null }
 
+# Complete progress bar
 if (-not $HideConsole) { Write-Progress -Activity "TrID Extension Correction" -Completed }
 
 $stdout = $stdoutLog.ToString().Trim()
