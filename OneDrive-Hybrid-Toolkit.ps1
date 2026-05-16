@@ -37,6 +37,7 @@ param(
     [switch]$ChracterCount,
     [switch]$LocalAccount,
     [switch]$LogsCollection,
+    [switch]$FileExplorerThumbnail_IconCacheRepair,
     [switch]$NoPrompt
 
 )
@@ -296,6 +297,36 @@ function Do-Reinstall {
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 }
 
+
+# ===== Icon Repair =====
+function IconRepair {
+    ie4uinit.exe -show
+    taskkill /IM explorer.exe /F
+    Stop-Process -Name explorer -Force
+
+    Remove-Item "$env:APPDATA\Microsoft\Windows\Recent\AutomaticDestinations\f01b4d95cf55d32a*" -Force -ErrorAction SilentlyContinue
+    del %AppData%\Microsoft\Windows\Recent\AutomaticDestinations\*
+
+
+
+    # Delete icon cache files properly in PowerShell
+    Remove-Item "$env:localappdata\IconCache.db" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$env:localappdata\Microsoft\Windows\Explorer\iconcache*" -Force -Recurse -ErrorAction SilentlyContinue
+
+    start explorer.exe
+
+    $path = "$env:USERPROFILE\OneDrive\Personal Vault"
+try {
+    [System.IO.Directory]::GetFiles($path) | Out-Null
+    Write-Host "ACCESS GRANTED (Vault should be locked)" -ForegroundColor Red
+} catch {
+    Write-Host "ACCESS DENIED (Expected when locked): $($_.Exception.Message)" -ForegroundColor Green
+}
+
+    Write-Log "Icon repair completed..." 'SUCCESS'
+}
+
+
 # ===== Logs Collection =====
 function logsCollection {
 		try {
@@ -410,7 +441,6 @@ catch {
 }
 
 }
-
 
 
 # ===== Local User Account =====
@@ -610,15 +640,16 @@ function Show-Menu {
     Write-Host "6. RealTimeDiagnostic"
     Write-Host "7. ChracterCount"
     Write-Host "8. New Local User Account"
-    Write-Host "9. Logs Collection"
-    Write-Host "10. Exit"
+    Write-Host "9. Logs Collection"    
+    Write-Host "10. Icon repair"
+    Write-Host "11. Exit"
     Write-Host ""
 }
 
 function Run-Menu {
     do {
         Show-Menu
-        $c = Read-Host "Select 1-10"
+        $c = Read-Host "Select 1-11"
         switch ($c) {
             '1' { Do-Remove; Pause }
             '2' { $script:DeepClean=$true; Do-Remove; Pause }
@@ -629,7 +660,8 @@ function Run-Menu {
             '7' { ChracterCount; Pause }
 	    '8' { NewLocalUserAccount; Pause }
 	    '9' { LogsCollection; Pause }
-            '10' { Write-Host "Exiting"; return }
+            '10' { IconRepair; Pause }
+            '11' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
