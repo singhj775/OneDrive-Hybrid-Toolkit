@@ -89,7 +89,7 @@ def LoadDataFromFile(filename):
         data = f.read(part_size)
         f.seek(filesize - part_size)
         data += b"|" + f.read()
-    f.close
+    f.close()
     return data.upper()
 
 
