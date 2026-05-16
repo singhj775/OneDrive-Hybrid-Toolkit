@@ -39,7 +39,7 @@ if ([string]::IsNullOrWhiteSpace($TargetDir)) {
         Write-Log "ERROR: -TargetDir parameter is required when running silently or via Task Scheduler." "ERROR"
         exit 1
     }
-    Write-Host "`n[TrID Auto] Please enter the target directory path:" -ForegroundColor Cyan
+    Write-Host "`n[Juni] Please enter the target directory path:" -ForegroundColor Cyan
     $TargetDir = Read-Host ">> Target Directory"
     if ([string]::IsNullOrWhiteSpace($TargetDir)) {
         Write-Log "ERROR: No directory provided. Exiting." "ERROR"
