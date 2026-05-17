@@ -41,7 +41,7 @@ Write-Host "📅 Time Range: $($StartTime.ToString('yyyy-MM-dd HH:mm')) to Now" 
 Write-Host "📁 Output Directory: $OutputFolder`n" -ForegroundColor Cyan
 
 # === 1. BIOMETRIC & PERSONAL VAULT UNLOCK EVENTS ===
-Write-Host "🔐 [1/6] Exporting Biometric & Personal Vault Unlock Events..." -ForegroundColor Yellow
+Write-Host "🔐 [1/7] Exporting Biometric & Personal Vault Unlock Events..." -ForegroundColor Yellow
 $BioEvents = @()
 $BioProviders = @("Goodix", "Windows Biometric Framework", "Microsoft-Windows-HelloForBusiness")
 foreach ($prov in $BioProviders) {
@@ -81,7 +81,7 @@ if ($OneDriveConflicts.Count -gt 0) {
 
 # 2b. Known HRESULT Error Codes via XPath
 Write-Host "  📝 Querying: Known OneDrive HRESULT Error Codes..."
-$OneDriveErrorCodes = @('0x80070005','0x8007018b','0x8004de96','0x80010007','0x80040c81','0x80071128','0x80071129','0x8004def5','0x8004def7')
+$OneDriveErrorCodes = @('0x80070005','0x8007018b','0x8004de96','0x80010007','0x80040c81','0x80071128','0x80071129','0x8004def5','0x8004def7', '0xc0000005', '0xe06d7363')
 $XPathFilter = @"
 <QueryList>
   <Query Id="0" Path="Application">
@@ -138,16 +138,27 @@ try {
 # === 4. SYSTEM LOG EVENTS ===
 Write-Host "`n💻 [4/6] Exporting System Log Events..." -ForegroundColor Yellow
 try {
-    $SystemEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=7030,10000,100001,20001,20002,20003,24756,24577,24579; StartTime=$StartTime} -ErrorAction SilentlyContinue
+    $SystemEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=3,7030,10000,100001,20001,20002,20003,24756,24577,24579; StartTime=$StartTime} -ErrorAction SilentlyContinue
     if ($SystemEvents.Count -gt 0) {
         $SystemEvents | Export-Csv "$OutputFolder\System_Events.csv" -NoTypeInformation -Encoding UTF8
         Write-Host "  ✅ System Events: $($SystemEvents.Count) exported" -ForegroundColor Green
     } else { Write-Host "  ℹ️  No System events matched in timeframe (normal if drivers/services were stable)." -ForegroundColor DarkYellow }
 } catch { Write-Host "  ⚠️ System log query failed: $_" -ForegroundColor DarkYellow }
 
-# === 5. INTERNAL ONEDRIVE LOGS ===
+# === 5. Application LOG EVENTS ===
+Write-Host "`n💻 [4/6] Exporting Application Log Events..." -ForegroundColor Yellow
+try {
+    $ApplicationEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=1000,1001,1002,1005,1026,10001,6100,6101,7016,36887; StartTime=$StartTime} -ErrorAction SilentlyContinue
+    if ($ApplicationEvents.Count -gt 0) {
+        $ApplicationEvents | Export-Csv "$OutputFolder\Application_Events.csv" -NoTypeInformation -Encoding UTF8
+        Write-Host "  ✅ Application Events: $($ApplicationEvents.Count) exported" -ForegroundColor Green
+    } else { Write-Host "  ℹ️  No Application events matched in timeframe (normal if drivers/services were stable)." -ForegroundColor DarkYellow }
+} catch { Write-Host "  ⚠️ Application log query failed: $_" -ForegroundColor DarkYellow }
+
+
+# === 6. INTERNAL ONEDRIVE LOGS ===
 Write-Host "`n📂 [5/6] Exporting Internal OneDrive Logs (if available)..." -ForegroundColor Yellow
-$InternalPaths = @("$env:LOCALAPPDATA\Microsoft\OneDrive\logs\Personal\*.log", "$env:LOCALAPPDATA\Microsoft\OneDrive\logs\Business1\*.log")
+$InternalPaths = @("$env:LOCALAPPDATA\Microsoft\OneDrive\logs", "$env:LOCALAPPDATA\Microsoft\OneDrive\logs\Business1\*.log")
 $InternalLogs = @()
 foreach ($p in $InternalPaths) {
     if (Test-Path $p) {
