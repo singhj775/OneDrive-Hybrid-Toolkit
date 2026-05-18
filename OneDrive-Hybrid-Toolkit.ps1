@@ -684,7 +684,7 @@ function Get-HealthScore {
 
 # ===== Monitoring =====
 
-function RealTimeDiagnostic {
+function RealTimeCPU {
 
     Write-Title "OneDrive Live Performance Monitor"
 
@@ -798,7 +798,7 @@ function Show-Menu {
     Write-Host "3. Remove + Delete My Files"
     Write-Host "4. Reinstall OneDrive"
     Write-Host "5. Block Reinstall (Policy)"
-    Write-Host "6. Real CPU Monitor"
+    Write-Host "6. ODC CPU Monitor"
     Write-Host "7. ChracterCount"
     Write-Host "8. New Local User Account"
     Write-Host "9. Logs Collection"    
