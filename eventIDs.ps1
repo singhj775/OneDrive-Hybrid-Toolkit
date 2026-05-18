@@ -146,15 +146,41 @@ try {
 } catch { Write-Host "  ⚠️ System log query failed: $_" -ForegroundColor DarkYellow }
 
 # === 5. Application LOG EVENTS ===
-Write-Host "`n💻 [4/6] Exporting Application Log Events..." -ForegroundColor Yellow
+Write-Host "`n💻 [5/6] Exporting Application & System Log Events..." -ForegroundColor Yellow
 try {
-    $ApplicationEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=1000,1001,1002,1005,1026,10001,6100,6101,7016,36887; StartTime=$StartTime} -ErrorAction SilentlyContinue
-    if ($ApplicationEvents.Count -gt 0) {
-        $ApplicationEvents | Export-Csv "$OutputFolder\Application_Events.csv" -NoTypeInformation -Encoding UTF8
-        Write-Host "  ✅ Application Events: $($ApplicationEvents.Count) exported" -ForegroundColor Green
-    } else { Write-Host "  ℹ️  No Application events matched in timeframe (normal if drivers/services were stable)." -ForegroundColor DarkYellow }
-} catch { Write-Host "  ⚠️ Application log query failed: $_" -ForegroundColor DarkYellow }
+    # 1. Application Log (App crashes, .NET errors, OneDrive)
+    $AppEvents = Get-WinEvent -FilterHashTable @{LogName="Application"; ID=1000,1001,1002,1026; StartTime=$StartTime} -ErrorAction SilentlyContinue
 
+    # 2. System Log (DCOM, Schannel, Network, Service events)
+    $SysEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=1000,1001,10001,6100,6101,36887; StartTime=$StartTime} -ErrorAction SilentlyContinue
+
+    # Combine & sort chronologically
+    $AllEvents = @($AppEvents) + @($SysEvents) | Sort-Object TimeCreated
+
+    if ($AllEvents.Count -gt 0) {
+        # Optional: Filter specifically for OneDrive-related crashes
+        $OneDriveEvents = $AllEvents | Where-Object {
+            $_.Message -match 'OneDrive\.exe|FileSyncClient\.dll|Microsoft\.SharePoint\.exe|onedrive'
+        }
+
+        # Export full set
+        $AllEvents | Select-Object TimeCreated, Id, LevelDisplayName, ProviderName, LogName, Message | 
+            Export-Csv "$OutputFolder\AppSys_Events.csv" -NoTypeInformation -Encoding UTF8
+
+        # Export OneDrive-specific subset (if any)
+        if ($OneDriveEvents.Count -gt 0) {
+            $OneDriveEvents | Select-Object TimeCreated, Id, LevelDisplayName, ProviderName, Message | 
+                Export-Csv "$OutputFolder\OneDrive_Crashes.csv" -NoTypeInformation -Encoding UTF8
+            Write-Host "  ✅ Total Events: $($AllEvents.Count) | 🎯 OneDrive Matches: $($OneDriveEvents.Count)" -ForegroundColor Green
+        } else {
+            Write-Host "  ✅ Total Events: $($AllEvents.Count) exported (No OneDrive-specific crashes found)" -ForegroundColor Green
+        }
+    } else {
+        Write-Host "  ℹ️  No matching events found in timeframe." -ForegroundColor DarkYellow
+    }
+} catch {
+    Write-Host "  ⚠️ Log query failed: $_" -ForegroundColor DarkYellow
+}
 
 # === 6. INTERNAL ONEDRIVE LOGS ===
 Write-Host "`n📂 [5/6] Exporting Internal OneDrive Logs (if available)..." -ForegroundColor Yellow
