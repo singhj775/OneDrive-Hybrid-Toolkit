@@ -39,6 +39,7 @@ param(
     [switch]$LogsCollection,
     [switch]$FileExplorerThumbnail_IconCacheRepair,
 	[switch]$SyncRepair,
+	[switch]$RealTimeMonitor,
     [switch]$NoPrompt
 
 )
@@ -786,6 +787,34 @@ function RealTimeCPU {
     }
 }
 
+
+ ================================
+# REAL-TIME FOLDER MONITOR
+# ================================
+
+function RealTimeMonitor {
+
+    Write-Title "Monitoring OneDrive Folder"
+
+    $Path = "$env:USERPROFILE\OneDrive"
+
+    $watcher = New-Object IO.FileSystemWatcher $Path -Property @{
+        IncludeSubdirectories = $true
+        EnableRaisingEvents = $true
+    }
+
+    Register-ObjectEvent $watcher Changed -Action {
+        Write-Host "Changed: $($Event.SourceEventArgs.FullPath)"
+    }
+
+    Register-ObjectEvent $watcher Created -Action {
+        Write-Host "Created: $($Event.SourceEventArgs.FullPath)"
+    }
+
+    while ($true) { Start-Sleep 5 }
+}
+
+
 # ===== Menu =====
 function Show-Menu {
     Clear-Host
@@ -804,6 +833,7 @@ function Show-Menu {
     Write-Host "9. Logs Collection"    
     Write-Host "10. Icon repair"
 	Write-Host "11. Sync repair"
+	Write-Host "1A. RealTime Folder Monitor"
     Write-Host "0. Exit"
     Write-Host ""
 }
@@ -824,6 +854,8 @@ function Run-Menu {
 	        '9' { LogsCollection; Pause }
             '10' { IconRepair; Pause }
 			'11' { SyncRepair; Pause }
+			"1B" { RealTimeMonitor }
+
             '0' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
