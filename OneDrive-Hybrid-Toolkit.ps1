@@ -818,10 +818,10 @@ function Run-Menu {
             '3' { $script:DeepClean=$true; $script:RemoveMyFiles=$true; Do-Remove; Pause }
             '4' { Do-Reinstall; Pause }
             '5' { Set-Policy -Block $true; Pause }
-	    '6' { RealTimeCPU }
+	        '6' { RealTimeCPU }
             '7' { ChracterCount; Pause }
-	    '8' { NewLocalUserAccount; Pause }
-	    '9' { LogsCollection; Pause }
+	        '8' { NewLocalUserAccount; Pause }
+	        '9' { LogsCollection; Pause }
             '10' { IconRepair; Pause }
 			'11' { SyncRepair; Pause }
             '0' { Write-Host "Exiting"; return }
