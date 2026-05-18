@@ -854,7 +854,7 @@ function Run-Menu {
 	        '9' { LogsCollection; Pause }
             '10' { IconRepair; Pause }
 			'11' { SyncRepair; Pause }
-			"1B" { RealTimeMonitor }
+			"1A" { RealTimeMonitor }
 
             '0' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
