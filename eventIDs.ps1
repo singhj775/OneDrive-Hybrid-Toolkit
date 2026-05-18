@@ -183,23 +183,76 @@ try {
 }
 
 # === 6. INTERNAL ONEDRIVE LOGS ===
-Write-Host "`n📂 [5/6] Exporting Internal OneDrive Logs (if available)..." -ForegroundColor Yellow
-$InternalPaths = @("$env:LOCALAPPDATA\Microsoft\OneDrive\logs", "$env:LOCALAPPDATA\Microsoft\OneDrive\logs\Business1\*.log")
-$InternalLogs = @()
-foreach ($p in $InternalPaths) {
-    if (Test-Path $p) {
-        try {
-            $InternalLogs += Get-Content $p -ErrorAction SilentlyContinue | Select-String -Pattern "(?i)error|conflict|fail|0x800" |
-                ForEach-Object { [PSCustomObject]@{ SourceFile = Split-Path $p -Leaf; Timestamp = (Get-Date); RawLine = $_.Line } }
-        } catch {}
+Write-Host "`n📂 [6/6] Exporting Internal OneDrive Consumer Logs..." -ForegroundColor Yellow
+
+Stop-Process -Name "OneDrive" -Force -ErrorAction SilentlyContinue
+Start-Sleep -Seconds 2
+Write-Host "ODC Stopped..." -ForegroundColor red
+
+$ConsumerLogRoot = Join-Path $env:LOCALAPPDATA "Microsoft\OneDrive\logs"
+$TargetFiles = @()
+
+# 1️⃣ Strictly target CONSUMER/Personal logs
+if (Test-Path (Join-Path $ConsumerLogRoot "Personal")) {
+    $TargetFiles += Get-ChildItem -Path (Join-Path $ConsumerLogRoot "Personal") -Filter "*.odl" -File -ErrorAction SilentlyContinue
+} else {
+    # Fallback: scan root logs but EXPLICITLY exclude Business folders
+    $TargetFiles += Get-ChildItem -Path $ConsumerLogRoot -Filter "*.odl" -Recurse -File -ErrorAction SilentlyContinue |
+                    Where-Object { $_.FullName -notmatch '\\Business\d+\\' }
+}
+
+$ParsedLogs = @()
+# 🔍 Regex to extract structured fields from .odl lines
+$LogRegex = [regex]'^\s*(?<Timestamp>\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\.\d{3})\s+\[PID:(?<PID>\d+)\s+TID:(?<TID>\d+)\]\s+(?:\[[^\]]+\]\s+)?(?:Level:\s*)?(?<Level>[A-Za-z]+)\s+(?<Message>.+)$'
+# ⚡ Fast pre-filter to avoid parsing millions of clean lines
+$ErrorFilter = "(?i)\b(ERROR|FAIL|CONFLICT|0x80|EXCEPTION|ACCESS DENIED|SYNC FAILED)\b"
+
+foreach ($file in $TargetFiles) {
+    if ($file.Length -gt 100MB) { continue } # Skip bloated logs to prevent memory spikes
+    try {
+        $Matches = Select-String -Path $file.FullName -Pattern $ErrorFilter -ErrorAction SilentlyContinue
+        if ($Matches) {
+            foreach ($m in $Matches) {
+                $line = $m.Line.Trim()
+                $rg = $LogRegex.Match($line)
+                
+                $ParsedLogs += if ($rg.Success) {
+                    [PSCustomObject]@{
+                        SourceFile = $file.Name
+                        Timestamp  = [datetime]$rg.Groups['Timestamp'].Value
+                        PID        = $rg.Groups['PID'].Value
+                        TID        = $rg.Groups['TID'].Value
+                        Level      = $rg.Groups['Level'].Value.ToUpper()
+                        Message    = $rg.Groups['Message'].Value.Trim()
+                        ExportTime = Get-Date
+                    }
+                } else {
+                    # Fallback for malformed lines that still contain error keywords
+                    [PSCustomObject]@{
+                        SourceFile = $file.Name
+                        Timestamp  = "Unknown"
+                        PID        = "N/A"
+                        TID        = "N/A"
+                        Level      = "UNPARSED"
+                        Message    = $line
+                        ExportTime = Get-Date
+                    }
+                }
+            }
+        }
+    } catch {
+        # Silently skip locked/inaccessible files (normal when OneDrive is running)
     }
 }
-if ($InternalLogs.Count -gt 0) {
-    $InternalLogs | Export-Csv "$OutputFolder\OneDrive_InternalLogs.csv" -NoTypeInformation -Encoding UTF8
-    Write-Host "  ✅ Internal Logs: $($InternalLogs.Count) lines exported" -ForegroundColor Green
-} else { Write-Host "  ℹ️  No internal OneDrive logs found." -ForegroundColor DarkYellow }
 
-# === 6. SUMMARY ===
+if ($ParsedLogs.Count -gt 0) {
+    $ParsedLogs | Sort-Object Timestamp | Export-Csv "$OutputFolder\OneDrive_Consumer_Errors.csv" -NoTypeInformation -Encoding UTF8
+    Write-Host "  ✅ Parsed $($ParsedLogs.Count) consumer error lines from .odl logs" -ForegroundColor Green
+} else {
+    Write-Host "  ℹ️  No consumer OneDrive errors found. (Personal account may not be active/syncing)" -ForegroundColor DarkYellow
+}
+
+# === 7. SUMMARY ===
 Write-Host "`n🎉 Export Complete!" -ForegroundColor Green
 Write-Host "📁 Files saved to: $OutputFolder" -ForegroundColor Cyan
 Write-Host "📊 File Summary:"
