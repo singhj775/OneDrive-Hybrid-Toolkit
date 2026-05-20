@@ -273,14 +273,14 @@ function Clean-Folders {
 
 # ===== Post-Reboot Task =====
 function New-PostRebootTask {
-    Write-Log "Creating post-reboot cleanup task..." 'INFO'
+    Write-Log "Creating post-reboot cleanup task1..." 'INFO'
     try {
         $cmd = 'cmd.exe /c "rmdir /s /q "%LOCALAPPDATA%\Microsoft\OneDrive" 2>nul & rmdir /s /q "%USERPROFILE%\OneDrive" 2>nul & schtasks /Delete /TN "' + $TaskName + '" /F 2>nul"'
         $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd"
         $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
         $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
         Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
-        Write-Log "Post-reboot task created" 'SUCCESS'
+        Write-Log "Post-reboot task created1" 'SUCCESS'
     } catch { Write-Log "Failed to create task: $_" 'ERROR' }
 }
 
