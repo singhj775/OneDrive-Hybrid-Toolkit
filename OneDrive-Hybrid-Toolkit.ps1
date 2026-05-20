@@ -149,7 +149,44 @@ function Run-Uninstallers {
             }
         }
     }
+# --------------------------------------------------
+# 2️Locate SQLite Databases
+# --------------------------------------------------
+
+	Write-Log ""
+	Write-Log "Scanning for SQLite databases..." -ForegroundColor Yellow
+
+	$sqliteFiles = Get-ChildItem -Path $OneDrivePath -Recurse -Include *.sqlite -ErrorAction SilentlyContinue
+
+	if ($sqliteFiles.Count -eq 0) {
+   		Write-Log "No SQLite DB files found." -ForegroundColor Red
+    	Add-Content $ReportPath "No SQLite DB files found."
+	} 
+	else {
+    	Write-Log "$($sqliteFiles.Count) SQLite files found." -ForegroundColor Green
+    	Add-Content $ReportPath "$($sqliteFiles.Count) SQLite files detected."
+	}
 }
+
+# --------------------------------------------------
+# Test DB File Access (Corruption / Lock Check)
+# --------------------------------------------------
+Write-Log ""
+Write-Log "Testing DB file integrity..." -ForegroundColor Yellow
+
+foreach ($db in $sqliteFiles) {
+    try {
+        $stream = [System.IO.File]::Open($db.FullName, 'Open', 'ReadWrite', 'None')
+        $stream.Close()
+        Write-Log "OK: $($db.Name)" -ForegroundColor Green
+        Add-Content $ReportPath "OK: $($db.FullName)"
+    }
+    catch {
+        Write-Log "LOCKED or CORRUPTED: $($db.Name)" -ForegroundColor Red
+        Add-Content $ReportPath "LOCKED or CORRUPTED: $($db.FullName)"
+    }
+}
+
 
 # ===== Remove AppX =====
 function Remove-AppX {
@@ -221,6 +258,17 @@ function Clean-Folders {
             catch { Write-Log "Could not delete (locked): $userOD" 'ERROR' }
         } else { Write-Log "Keeping user folder: $userOD" 'INFO' }
     }
+
+	Write-Log "Creating post-reboot cleanup task..." 'INFO'
+    try {
+        $cmd = 'cmd.exe /c "rmdir /s /q "%LOCALAPPDATA%\Microsoft\OneDrive" 2>nul & rmdir /s /q "%USERPROFILE%\OneDrive" 2>nul & schtasks /Delete /TN "' + $TaskName + '" /F 2>nul"'
+        $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd"
+        $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+        $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable
+        Register-ScheduledTask -TaskName $TaskName -Action $action -Principal $principal -Settings $settings -Force | Out-Null
+        Write-Log "Post-reboot task created" 'SUCCESS'
+    } catch { Write-Log "Failed to create task: $_" 'ERROR' }
+
 }
 
 # ===== Post-Reboot Task =====
