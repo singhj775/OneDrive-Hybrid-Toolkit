@@ -98,6 +98,8 @@ function Stop-OneDriveProcs {
         Get-Process -Name $_ -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
     }
     Start-Sleep -Seconds 2
+	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
+	taskkill /f /im onedrive.sync.service.exe
 }
 
 # ===== Run Uninstallers (Safe String Parsing) =====
@@ -223,11 +225,15 @@ function Clean-Registry {
     Write-Log "Removing Broken Identity Cache..." 'INFO'
 
 	Stop-Process -Name OneDrive -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name TokenBroker -Force -ErrorAction SilentlyContinue
+    Stop-Process -Name IdentityCRL -Force -ErrorAction SilentlyContinue
+	sc stop "OneDrive Sync Service" | Out-Null
 
-Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
-Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
-Write-Log "Removed Broken Identity Cache..." 'INFO'
+
+	Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
+	Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
+	Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
+	Write-Log "Removed Broken Identity Cache..." 'INFO'
 
 }
 
