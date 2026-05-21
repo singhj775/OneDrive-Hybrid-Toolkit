@@ -101,8 +101,12 @@ function Stop-OneDriveProcs {
 	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
 	taskkill /f /im onedrive.sync.service.exe
 	sc stop "FileCoAuth" | Out-Null
-	Stop-Service OneDriveUpdater -Force
-	Set-Service OneDriveUpdater -StartupType Disabled
+    Get-Process filecoauth -ErrorAction SilentlyContinue | Stop-Process -Force
+	Get-Service | Where-Object { $_.Name -like "*OneDrive*" } | ForEach-Object {
+    sc stop $_.Name
+    sc delete $_.Name
+}
+
 }
 
 # ===== Run Uninstallers (Safe String Parsing) =====
@@ -236,27 +240,16 @@ function Clean-Registry {
 	sc stop "OneDrive Sync Service" | Out-Null
 	Get-Process filecoauth -ErrorAction SilentlyContinue | Stop-Process -Force
 
-	Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
-	Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
-	Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
-
-	$updater = "$env:LOCALAPPDATA\Microsoft\OneDrive\Update\OneDriveUpdater.exe"
-	if (Test-Path $updater) {
-    	Rename-Item $updater "$updater.bak"
-}
-	$coauthPath = "$env:LOCALAPPDATA\Microsoft\OneDrive\filecoauth.exe"
-	if (Test-Path $coauthPath) {
-    	Rename-Item $coauthPath "$coauthPath.bak"
-}
+	
 	Write-Log "Removed Broken Identity Cache..." 'SUCCESS'
 
-	
 
 }
 
 # ===== Folder Cleanup =====
 function Clean-Folders {
     Write-Log "Cleaning folders..." 'INFO'
+	
     $folders = @(
         "$env:LOCALAPPDATA\Microsoft\OneDrive",
         "$env:LOCALAPPDATA\OneDrive",
@@ -268,7 +261,12 @@ function Clean-Folders {
     foreach ($f in $folders) {
         if (Test-Path $f) {
             if ($DeepClean) {
-                try { Remove-Item -Path $f -Recurse -Force -ErrorAction Stop; Write-Log "Removed: $f" 'SUCCESS' }
+                try { 
+					Remove-Item -Path $f -Recurse -Force -ErrorAction Stop; Write-Log "Removed: $f" 'SUCCESS' 
+					Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
+					Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
+					Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
+}
                 catch { Write-Log "Could not remove: $f" 'WARN' }
             } else { Write-Log "Skipped (use -DeepClean): $f" 'INFO' }
         }
@@ -364,6 +362,15 @@ function Do-Remove {
 # ===== Reinstall =====
 function Do-Reinstall {
     Write-Log "Reinstalling OneDrive..." 'INFO'
+	$updater = "$env:LOCALAPPDATA\Microsoft\OneDrive\Update\OneDriveUpdater.exe"
+	if (Test-Path $updater) {
+    	Rename-Item $updater "$updater.bak"
+}
+	$coauthPath = "$env:LOCALAPPDATA\Microsoft\OneDrive\filecoauth.exe"
+	if (Test-Path $coauthPath) {
+    	Rename-Item $coauthPath "$coauthPath.bak"
+}
+
     if ($BlockReinstall) { Set-Policy -Block $false }
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
     if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
