@@ -371,15 +371,23 @@ function Do-Reinstall {
     if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 	Stop-OneDriveProcs
-	$updater = "$env:LOCALAPPDATA\Microsoft\OneDrive\Update\OneDriveUpdater.exe"
-	
-	if (Test-Path $updater) {
-    	Rename-Item $updater "$updater.bak"
+
+	# Define updater paths in Program Files
+	$updaterPaths = @(
+    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveUpdater.exe",
+    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveStandaloneUpdater.exe"
+)
+
+	foreach ($path in $updaterPaths) {
+    	if (Test-Path $path) {
+        	Rename-Item $path "$path.bak" -Force
+        	Write-Log "Renamed $path to $path.bak"
+    } 	else {
+        	Write-Log "Updater not found at $path"
+    }
 }
-	$coauthPath = "$env:LOCALAPPDATA\Microsoft\OneDrive\filecoauth.exe"
-	if (Test-Path $coauthPath) {
-    	Rename-Item $coauthPath "$coauthPath.bak"
-}
+
+
 }
 
 # ===== ODC Repair =====
