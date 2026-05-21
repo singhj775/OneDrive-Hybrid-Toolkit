@@ -284,6 +284,7 @@ function Clean-Folders {
     }
 
 	Write-Log "Creating post-reboot cleanup task1..." 'INFO'
+	Start-Process explorer.exe
     try {
         $cmd = 'cmd.exe /c "rmdir /s /q "%LOCALAPPDATA%\Microsoft\OneDrive" 2>nul & rmdir /s /q "%USERPROFILE%\OneDrive" 2>nul & schtasks /Delete /TN "' + $TaskName + '" /F 2>nul"'
         $action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c $cmd"
@@ -376,7 +377,7 @@ function Do-Reinstall {
 	$updaterPaths = @(
 		"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveSetup.exe",
     	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveUpdater.exe",
-    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveStandaloneUpdater.exe"
+    	"$env:ProgramFiles\Microsoft OneDrive\OneDriveStandaloneUpdater.exe"
 
 )
 
