@@ -240,7 +240,9 @@ function Clean-Registry {
 	sc stop "OneDrive Sync Service" | Out-Null
 	Get-Process filecoauth -ErrorAction SilentlyContinue | Stop-Process -Force
 
-	
+	taskkill /IM explorer.exe /F
+    Stop-Process -Name explorer -Force
+
 	Write-Log "Removed Broken Identity Cache..." 'SUCCESS'
 
 
