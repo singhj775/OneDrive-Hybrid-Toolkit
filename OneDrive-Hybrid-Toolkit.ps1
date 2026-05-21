@@ -100,6 +100,9 @@ function Stop-OneDriveProcs {
     Start-Sleep -Seconds 2
 	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
 	taskkill /f /im onedrive.sync.service.exe
+	sc stop "FileCoAuth" | Out-Null
+	Stop-Service OneDriveUpdater -Force
+	Set-Service OneDriveUpdater -StartupType Disabled
 }
 
 # ===== Run Uninstallers (Safe String Parsing) =====
@@ -120,6 +123,9 @@ function Run-Uninstallers {
             } catch { Write-Log "Failed: $p - $_" 'ERROR' }
         }
     }
+	
+
+
     # Registry fallback (Zero regex, pure string methods)
     $regPaths = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall','HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall'
     foreach ($rp in $regPaths) {
@@ -228,12 +234,23 @@ function Clean-Registry {
     Stop-Process -Name TokenBroker -Force -ErrorAction SilentlyContinue
     Stop-Process -Name IdentityCRL -Force -ErrorAction SilentlyContinue
 	sc stop "OneDrive Sync Service" | Out-Null
-
+	Get-Process filecoauth -ErrorAction SilentlyContinue | Stop-Process -Force
 
 	Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 	Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
 	Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
-	Write-Log "Removed Broken Identity Cache..." 'INFO'
+
+	$updater = "$env:LOCALAPPDATA\Microsoft\OneDrive\Update\OneDriveUpdater.exe"
+	if (Test-Path $updater) {
+    	Rename-Item $updater "$updater.bak"
+}
+	$coauthPath = "$env:LOCALAPPDATA\Microsoft\OneDrive\filecoauth.exe"
+	if (Test-Path $coauthPath) {
+    	Rename-Item $coauthPath "$coauthPath.bak"
+}
+	Write-Log "Removed Broken Identity Cache..." 'SUCCESS'
+
+	
 
 }
 
