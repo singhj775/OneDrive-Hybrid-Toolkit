@@ -389,6 +389,8 @@ function Do-Reinstall {
         	Write-Log "Updater not found at $path"
     }
 }
+	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
+	icacls "C:\Program Files\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
 
 
 }
