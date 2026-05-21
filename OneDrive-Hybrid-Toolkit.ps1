@@ -162,7 +162,7 @@ function Run-Uninstallers {
         }
     }
 # --------------------------------------------------
-# 2️Locate SQLite Databases
+# Locate SQLite Databases
 # --------------------------------------------------
 
 	Write-Log ""
@@ -268,6 +268,7 @@ function Clean-Folders {
 					Remove-Item "$env:LOCALAPPDATA\Microsoft\OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 					Remove-Item "$env:LOCALAPPDATA\Microsoft\IdentityCache" -Recurse -Force -ErrorAction SilentlyContinue
 					Remove-Item "$env:LOCALAPPDATA\Microsoft\TokenBroker" -Recurse -Force -ErrorAction SilentlyContinue
+					Remove-Item "$env:ProgramFiles\Microsoft OneDrive" -Recurse -Force -ErrorAction SilentlyContinue
 }
                 catch { Write-Log "Could not remove: $f" 'WARN' }
             } else { Write-Log "Skipped (use -DeepClean): $f" 'INFO' }
@@ -364,7 +365,14 @@ function Do-Remove {
 # ===== Reinstall =====
 function Do-Reinstall {
     Write-Log "Reinstalling OneDrive..." 'INFO'
+
+    if ($BlockReinstall) { Set-Policy -Block $false }
+    $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
+    if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
+    else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
+	Stop-OneDriveProcs
 	$updater = "$env:LOCALAPPDATA\Microsoft\OneDrive\Update\OneDriveUpdater.exe"
+	
 	if (Test-Path $updater) {
     	Rename-Item $updater "$updater.bak"
 }
@@ -372,11 +380,6 @@ function Do-Reinstall {
 	if (Test-Path $coauthPath) {
     	Rename-Item $coauthPath "$coauthPath.bak"
 }
-
-    if ($BlockReinstall) { Set-Policy -Block $false }
-    $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
-    if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
-    else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 }
 
 # ===== ODC Repair =====
