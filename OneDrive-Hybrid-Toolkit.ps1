@@ -375,8 +375,8 @@ function Do-Reinstall {
 	# Define updater paths in Program Files
 	$updaterPaths = @(
     	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveUpdater.exe",
-    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveStandaloneUpdater.exe"
-		"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveSetup.exe",
+    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveStandaloneUpdater.exe",
+		"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveSetup.exe"
 
 )
 
