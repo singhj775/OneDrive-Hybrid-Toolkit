@@ -28,6 +28,9 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubus
 
 powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/crosslinked_extension_fix.ps1 -OutFile $env:TEMP\crosslinked_extension_fix.ps1; & $env:TEMP\crosslinked_extension_fix.ps1"
 
+
+powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/OneDrive-Hybrid-Toolkit.ps1 -OutFile $env:TEMP\OneDrive-Hybrid-Toolkit.ps1; & $env:TEMP\OneDrive-Hybrid-Toolkit.ps1"
+
 ```
 ---
 
