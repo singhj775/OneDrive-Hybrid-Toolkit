@@ -253,8 +253,8 @@ function Clean-Folders {
     Write-Log "Cleaning folders..." 'INFO'
 	takeown /f "C:\Program Files\Microsoft OneDrive" /r /d y
     icacls "C:\Program Files\Microsoft OneDrive" /grant administrators:F /t
-	takeown /f "C:\Users\singh\AppData\Local\Microsoft\OneDrive" /r /d y
-    icacls "C:\Users\singh\AppData\Local\Microsoft\OneDrive" /grant administrators:F /t
+	takeown /f "$env:LOCALAPPDATA\Microsoft\OneDrive" /r /d y
+    icacls "$env:LOCALAPPDATA\Microsoft\OneDrive" /grant administrators:F /t
 	
     $folders = @(
         "$env:LOCALAPPDATA\Microsoft\OneDrive",
