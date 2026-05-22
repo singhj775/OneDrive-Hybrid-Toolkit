@@ -149,7 +149,7 @@ try {
 Write-Host "`n💻 [5/6] Exporting Application & System Log Events..." -ForegroundColor Yellow
 try {
     # 1. Application Log (App crashes, .NET errors, OneDrive)
-    $AppEvents = Get-WinEvent -FilterHashTable @{LogName="Application"; ID=1000,1001,1002,1026; StartTime=$StartTime} -ErrorAction SilentlyContinue
+    $AppEvents = Get-WinEvent -FilterHashTable @{LogName="Application"; ID=1000,1001,1002,1026,1005; StartTime=$StartTime} -ErrorAction SilentlyContinue
 
     # 2. System Log (DCOM, Schannel, Network, Service events)
     $SysEvents = Get-WinEvent -FilterHashTable @{LogName="System"; ID=1000,1001,10001,6100,6101,36887; StartTime=$StartTime} -ErrorAction SilentlyContinue
