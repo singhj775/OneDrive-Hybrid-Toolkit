@@ -732,6 +732,109 @@ function NewLocalUserAccount {
 # ===== Chracter Count =====
 
 function ChracterCount {
+	param (
+        [string]$ReportPath = "C:\Temp\OneDrive_Full_Diagnostic_Report.txt",
+        [int]$MaxPathLength = 240
+    )
+
+    # Initialize report
+    "===== OneDrive Full Diagnostic Report =====" | Out-File $ReportPath
+    "Generated: $(Get-Date)" | Out-File -Append $ReportPath
+
+    "`n--- Configured Accounts ---" | Out-File -Append $ReportPath
+
+    $Accounts = Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive\Accounts\*" -ErrorAction SilentlyContinue
+
+    if (!$Accounts) {
+        "❌ No OneDrive accounts configured" | Out-File -Append $ReportPath
+        return [PSCustomObject]@{
+            AccountsScanned = 0
+            TotalItems      = 0
+            TotalIssues     = 0
+            ReportPath      = $ReportPath
+        }
+    }
+
+    $TotalAccounts = 0
+    $GrandTotalItems = 0
+    $GrandTotalIssues = 0
+
+    foreach ($Acc in $Accounts) {
+        $TotalAccounts++
+
+        "Account: $($Acc.DisplayName)" | Out-File -Append $ReportPath
+        "Email  : $($Acc.UserEmail)" | Out-File -Append $ReportPath
+        "Folder : $($Acc.UserFolder)" | Out-File -Append $ReportPath
+
+        if (!(Test-Path $Acc.UserFolder)) {
+            "⚠️ Reason: Sync folder missing → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
+            continue
+        }
+
+        $RootPath = $Acc.UserFolder
+        "`n--- File Scan ($RootPath) ---" | Out-File -Append $ReportPath
+
+        $InvalidChars = '[\"*:<>?/\\|]'
+        $Reserved = @("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
+
+        $IssueCount = 0
+        $ItemCount = 0
+
+        $Files = Get-ChildItem -LiteralPath $RootPath -Recurse -Force -ErrorAction SilentlyContinue
+
+        foreach ($File in $Files) {
+            $ItemCount++
+            $Issues = @()
+
+            $Name = $File.Name
+            $FullPath = $File.FullName
+
+            if ($FullPath.Length -ge $MaxPathLength) {
+                $Issues += "LongPath → Reason: Exceeds $MaxPathLength characters → Fix: Shorten path"
+            }
+            if ($Name -match $InvalidChars) {
+                $Issues += "InvalidChar → Reason: Unsupported characters → Fix: Rename"
+            }
+            if ($Name -match '(^\s)|(\s$)|(\.$)') {
+                $Issues += "NamingIssue → Reason: Leading/trailing space or dot → Fix: Rename"
+            }
+            $Base = [System.IO.Path]::GetFileNameWithoutExtension($Name)
+            if ($Reserved -contains $Base.ToUpper()) {
+                $Issues += "ReservedName → Reason: Windows reserved name → Fix: Rename"
+            }
+            if ($File.Attributes -match "System") {
+                $Issues += "SystemFile → Reason: System attribute may block sync → Fix: attrib -s"
+            }
+            if ($Name -like "~$*") {
+                $Issues += "TempFile → Reason: Temporary Office file → Fix: Close app/delete"
+            }
+            if ($File.Extension -in ".ini",".db") {
+                $Issues += "Metadata → Reason: App/system file → Fix: Move outside OneDrive"
+            }
+            if ($Name -match '[\x00-\x1F]') {
+                $Issues += "InvalidUnicode → Reason: Control characters → Fix: Rename"
+            }
+
+            if ($Issues.Count -gt 0) {
+                $IssueCount++
+                "$FullPath --> $($Issues -join ' | ')" | Out-File -Append $ReportPath
+            }
+        }
+
+        "Scanned: $ItemCount items" | Out-File -Append $ReportPath
+        "Issues : $IssueCount found" | Out-File -Append $ReportPath
+
+        $GrandTotalItems += $ItemCount
+        $GrandTotalIssues += $IssueCount
+    }
+
+    # Return summary object
+    return [PSCustomObject]@{
+        AccountsScanned = $TotalAccounts
+        TotalItems      = $GrandTotalItems
+        TotalIssues     = $GrandTotalIssues
+        ReportPath      = $ReportPath
+    }
 
 }
 # ================================
