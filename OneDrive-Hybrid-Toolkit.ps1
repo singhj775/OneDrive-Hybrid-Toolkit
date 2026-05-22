@@ -833,10 +833,10 @@ foreach ($Acc in $Accounts) {
     "Issues : $IssueCount found" | Out-File -Append $Report
 }
 
-
 }
 
 
+}
 # ================================
 # HEALTH SCORE
 # ================================
