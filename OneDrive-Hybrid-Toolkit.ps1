@@ -801,7 +801,7 @@ function ChracterCount {
     "Issues : $IssueCount found" | Out-File -Append $Report
 }
 
-}
+
 
 
 
