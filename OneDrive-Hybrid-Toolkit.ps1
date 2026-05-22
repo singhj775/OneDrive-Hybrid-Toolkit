@@ -733,7 +733,7 @@ function NewLocalUserAccount {
 
 function ChracterCount {
 param (
-        [string]$ReportPath = "C:\Temp\OneDrive_Full_Diagnostic_Report.txt",
+        [string]$ReportPath = "C:\OneDrive_Full_Diagnostic_Report.txt",
         [int]$MaxPathLength = 240
     )
 
