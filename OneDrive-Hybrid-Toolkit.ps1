@@ -740,27 +740,29 @@ function ChracterCount {
 
 	"`n--- Configured Accounts ---" | Out-File -Append $Report
 
-	$Accounts = Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive\Accounts\*" -ErrorAction SilentlyContinue
+$Accounts = Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive\Accounts\*" -ErrorAction SilentlyContinue
 
-	if (!$Accounts) {
-    	"❌ No OneDrive accounts configured" | Out-File -Append $Report
+if (!$Accounts) {
+    "❌ No OneDrive accounts configured" | Out-File -Append $Report
     exit
 }
 
-	foreach ($Acc in $Accounts) {
+foreach ($Acc in $Accounts) {
 
-    	"Account: $($Acc.DisplayName)" | Out-File -Append $Report
-    	"Email  : $($Acc.UserEmail)" | Out-File -Append $Report
-    	"Folder : $($Acc.UserFolder)" | Out-File -Append $Report
+    "Account: $($Acc.DisplayName)" | Out-File -Append $Report
+    "Email  : $($Acc.UserEmail)" | Out-File -Append $Report
+    "Folder : $($Acc.UserFolder)" | Out-File -Append $Report
 
     if (!(Test-Path $Acc.UserFolder)) {
-        	"⚠️ Reason: Sync folder missing → Fix: Re-link OneDrive" | Out-File -Append $Report
-    continue
+        "⚠️ Reason: Sync folder missing → Fix: Re-link OneDrive" | Out-File -Append $Report
+        continue
     }
 
     $RootPath = $Acc.UserFolder
 
-
+    # ==========================================
+    # 4. FILE SCAN
+    # ==========================================
     "`n--- File Scan ($RootPath) ---" | Out-File -Append $Report
 
     $MaxPath = 240
@@ -832,7 +834,7 @@ function ChracterCount {
 }
 
 
-
+}
 
 
 # ================================
