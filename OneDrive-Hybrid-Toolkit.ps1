@@ -369,9 +369,9 @@ function Do-Reinstall {
 
     if ($BlockReinstall) { Set-Policy -Block $false }
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
-    if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
+    if (Test-Path $installer) {Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
+; Write-Log "Installer launched" 'SUCCESS' }
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
-	Stop-OneDriveProcs
 
 	# Define updater paths in Program Files
 	$updaterPaths = @(
