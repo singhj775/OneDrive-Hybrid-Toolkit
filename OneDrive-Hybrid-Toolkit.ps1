@@ -373,8 +373,9 @@ function Do-Reinstall {
 
     if ($BlockReinstall) { Set-Policy -Block $false }
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
-    if (Test-Path $installer) { Start-Process -FilePath $installer -Wait; Write-Log "Installer launched" 'SUCCESS' }
+    if (Test-Path $installer) { Start-Process -FilePath $installer; Write-Log "Installer launched" 'SUCCESS' }
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
+	Start-Sleep -Seconds 10
 	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
 
 	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
