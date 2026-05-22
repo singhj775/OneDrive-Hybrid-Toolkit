@@ -372,34 +372,41 @@ function Do-Reinstall {
     Write-Log "Reinstalling OneDrive..." 'INFO'
 
     if ($BlockReinstall) { Set-Policy -Block $false }
+
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
-    if (Test-Path $installer) { Start-Process -FilePath $installer; Write-Log "Installer launched" 'SUCCESS' }
-    else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
-	Start-Sleep -Seconds 10
-	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
-
-	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
-	icacls "C:\Program Files\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
-
-
-	# Define updater paths in Program Files
-	$updaterPaths = @(
-		"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveSetup.exe",
-    	"$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveUpdater.exe",
-    	"$env:ProgramFiles\Microsoft OneDrive\OneDriveStandaloneUpdater.exe"
-
-)
-
-	foreach ($path in $updaterPaths) {
-    	if (Test-Path $path) {
-        	Rename-Item $path "$path.bak" -Force
-        	Write-Log "Renamed $path to $path.bak"
-    } 	else {
-        	Write-Log "Updater not found at $path"
+    if (Test-Path $installer) {
+        # Launch installer without -Wait so script continues
+        Start-Process -FilePath $installer
+        Write-Log "Installer launched" 'SUCCESS'
+    } else {
+        Write-Log "Installer not found locally. Please download manually." 'WARN'
+        return
     }
-}
 
+    # Allow installer to spawn processes
+    Start-Sleep -Seconds 15
 
+    # Stop any leftover OneDrive processes
+    Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
+
+    # Apply ACL changes AFTER reinstall completes
+    icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
+    icacls "$env:ProgramFiles\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
+
+    $updaterPaths = @(
+        "$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveSetup.exe",
+        "$env:ProgramFiles\Microsoft OneDrive\Update\OneDriveUpdater.exe",
+        "$env:ProgramFiles\Microsoft OneDrive\OneDriveStandaloneUpdater.exe"
+    )
+
+    foreach ($path in $updaterPaths) {
+        if (Test-Path $path) {
+            Rename-Item $path "$path.bak" -Force
+            Write-Log "Renamed $path to $path.bak"
+        } else {
+            Write-Log "Updater not found at $path"
+        }
+    }
 }
 
 # ===== ODC Repair =====
