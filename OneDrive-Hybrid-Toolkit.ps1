@@ -732,15 +732,14 @@ function NewLocalUserAccount {
 # ===== Chracter Count =====
 
 function ChracterCount {
-	param (
+
+	    param (
         [string]$ReportPath = "C:\Temp\OneDrive_Full_Diagnostic_Report.txt",
         [int]$MaxPathLength = 240
     )
 
-    # Initialize report
     "===== OneDrive Full Diagnostic Report =====" | Out-File $ReportPath
     "Generated: $(Get-Date)" | Out-File -Append $ReportPath
-
     "`n--- Configured Accounts ---" | Out-File -Append $ReportPath
 
     $Accounts = Get-ItemProperty "HKCU:\Software\Microsoft\OneDrive\Accounts\*" -ErrorAction SilentlyContinue
@@ -752,22 +751,31 @@ function ChracterCount {
             TotalItems      = 0
             TotalIssues     = 0
             ReportPath      = $ReportPath
+            Accounts        = @()
         }
     }
 
-    $TotalAccounts = 0
+    $SummaryAccounts = @()
     $GrandTotalItems = 0
     $GrandTotalIssues = 0
+    $TotalAccounts = 0
 
     foreach ($Acc in $Accounts) {
         $TotalAccounts++
 
         "Account: $($Acc.DisplayName)" | Out-File -Append $ReportPath
-        "Email  : $($Acc.UserEmail)" | Out-File -Append $ReportPath
-        "Folder : $($Acc.UserFolder)" | Out-File -Append $ReportPath
+        "Email  : $($Acc.UserEmail)"   | Out-File -Append $ReportPath
+        "Folder : $($Acc.UserFolder)"  | Out-File -Append $ReportPath
 
-        if (!(Test-Path $Acc.UserFolder)) {
-            "⚠️ Reason: Sync folder missing → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
+        if ([string]::IsNullOrWhiteSpace($Acc.UserFolder) -or !(Test-Path $Acc.UserFolder)) {
+            "⚠️ Reason: Sync folder missing or not set → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
+            $SummaryAccounts += [PSCustomObject]@{
+                DisplayName = $Acc.DisplayName
+                Email       = $Acc.UserEmail
+                Folder      = $Acc.UserFolder
+                ItemsScanned= 0
+                IssuesFound = 0
+            }
             continue
         }
 
@@ -826,16 +834,23 @@ function ChracterCount {
 
         $GrandTotalItems += $ItemCount
         $GrandTotalIssues += $IssueCount
+
+        $SummaryAccounts += [PSCustomObject]@{
+            DisplayName = $Acc.DisplayName
+            Email       = $Acc.UserEmail
+            Folder      = $Acc.UserFolder
+            ItemsScanned= $ItemCount
+            IssuesFound = $IssueCount
+        }
     }
 
-    # Return summary object
     return [PSCustomObject]@{
         AccountsScanned = $TotalAccounts
         TotalItems      = $GrandTotalItems
         TotalIssues     = $GrandTotalIssues
         ReportPath      = $ReportPath
+        Accounts        = $SummaryAccounts
     }
-
 }
 # ================================
 # HEALTH SCORE
