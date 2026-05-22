@@ -732,8 +732,7 @@ function NewLocalUserAccount {
 # ===== Chracter Count =====
 
 function ChracterCount {
-
-	    param (
+param (
         [string]$ReportPath = "C:\Temp\OneDrive_Full_Diagnostic_Report.txt",
         [int]$MaxPathLength = 240
     )
@@ -767,8 +766,21 @@ function ChracterCount {
         "Email  : $($Acc.UserEmail)"   | Out-File -Append $ReportPath
         "Folder : $($Acc.UserFolder)"  | Out-File -Append $ReportPath
 
-        if ([string]::IsNullOrWhiteSpace($Acc.UserFolder) -or !(Test-Path $Acc.UserFolder)) {
-            "⚠️ Reason: Sync folder missing or not set → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
+        # Guard against null or empty UserFolder
+        if ([string]::IsNullOrWhiteSpace($Acc.UserFolder)) {
+            "⚠️ Reason: Sync folder not set → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
+            $SummaryAccounts += [PSCustomObject]@{
+                DisplayName = $Acc.DisplayName
+                Email       = $Acc.UserEmail
+                Folder      = $Acc.UserFolder
+                ItemsScanned= 0
+                IssuesFound = 0
+            }
+            continue
+        }
+
+        if (!(Test-Path -LiteralPath $Acc.UserFolder)) {
+            "⚠️ Reason: Sync folder missing → Fix: Re-link OneDrive" | Out-File -Append $ReportPath
             $SummaryAccounts += [PSCustomObject]@{
                 DisplayName = $Acc.DisplayName
                 Email       = $Acc.UserEmail
