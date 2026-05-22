@@ -730,7 +730,14 @@ function NewLocalUserAccount {
 }
 
 # ===== Chracter Count =====
+
 function ChracterCount {
+
+	# REPORT
+	$Report = "c:\temp\OneDrive_Full_Diagnostic_Report.txt"
+	"===== OneDrive Full Diagnostic Report =====" | Out-File $Report
+	"Generated: $(Get-Date)" | Out-File -Append $Report
+
     "`n--- File Scan ($RootPath) ---" | Out-File -Append $Report
 
     $MaxPath = 240
