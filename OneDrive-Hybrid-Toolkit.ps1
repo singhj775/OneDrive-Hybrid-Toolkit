@@ -370,14 +370,16 @@ function Do-Remove {
 # ===== Reinstall =====
 function Do-Reinstall {
     Write-Log "Reinstalling OneDrive..." 'INFO'
-	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
-	icacls "C:\Program Files\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
 
     if ($BlockReinstall) { Set-Policy -Block $false }
     $installer = "$env:SystemRoot\System32\OneDriveSetup.exe"
     if (Test-Path $installer) { Start-Process -FilePath $installer -wait; Write-Log "Installer launched" 'SUCCESS' }
     else { Write-Log "Download from: https://www.microsoft.com/onedrive/download" 'WARN' }
 	Get-Process OneDrive* -ErrorAction SilentlyContinue | Stop-Process -Force
+
+	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
+	icacls "C:\Program Files\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
+
 
 	# Define updater paths in Program Files
 	$updaterPaths = @(
@@ -395,8 +397,6 @@ function Do-Reinstall {
         	Write-Log "Updater not found at $path"
     }
 }
-	icacls "$env:LOCALAPPDATA\Microsoft\OneDrive\Update" /deny "*S-1-1-0:(W)"
-	icacls "C:\Program Files\Microsoft OneDrive\Update" /deny "*S-1-1-0:(W)"
 
 
 }
