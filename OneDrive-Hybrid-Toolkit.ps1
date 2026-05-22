@@ -731,43 +731,75 @@ function NewLocalUserAccount {
 
 # ===== Chracter Count =====
 function ChracterCount {
-# Detect current user profile and OneDrive path
-$UserProfile = $env:USERPROFILE
-$BaseFolder  = Join-Path $UserProfile "OneDrive"
-$OutputCsv   = Join-Path $BaseFolder "CharacterCountResults.csv"
+    "`n--- File Scan ($RootPath) ---" | Out-File -Append $Report
 
-$results = @()
+    $MaxPath = 240
+    $InvalidChars = '[\"*:<>?/\\|]'
+    $Reserved = @("CON","PRN","AUX","NUL","COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9","LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9")
 
-# Get all folders
-Get-ChildItem -Path $BaseFolder -Recurse -Directory | ForEach-Object {
-    $folderName      = $_.Name
-    $folderCharCount = $folderName.Length
-    $fullPathLength  = $_.FullName.Length
-    $results += [PSCustomObject]@{
-        Type           = "Folder"
-        Path           = $_.FullName
-        NameCharCount  = $folderCharCount
-        FullPathLength = $fullPathLength
+    $IssueCount = 0
+    $ItemCount = 0
+
+    $Files = Get-ChildItem -LiteralPath $RootPath -Recurse -Force -ErrorAction SilentlyContinue
+
+    foreach ($File in $Files) {
+
+        $ItemCount++
+        $Issues = @()
+
+        $Name = $File.Name
+        $FullPath = $File.FullName
+
+        # Long path
+        if ($FullPath.Length -ge $MaxPath) {
+            $Issues += "LongPath → Reason: Exceeds 240 characters → Fix: Shorten path"
+        }
+
+        # Invalid characters
+        if ($Name -match $InvalidChars) {
+            $Issues += "InvalidChar → Reason: Unsupported characters → Fix: Rename"
+        }
+
+        # Leading/trailing space or dot
+        if ($Name -match '(^\s)|(\s$)|(\.$)') {
+            $Issues += "NamingIssue → Reason: Leading/trailing space or dot → Fix: Rename"
+        }
+
+        # Reserved names
+        $Base = [System.IO.Path]::GetFileNameWithoutExtension($Name)
+        if ($Reserved -contains $Base.ToUpper()) {
+            $Issues += "ReservedName → Reason: Windows reserved name → Fix: Rename"
+        }
+
+        # System attribute
+        if ($File.Attributes -match "System") {
+            $Issues += "SystemFile → Reason: System attribute may block sync → Fix: attrib -s"
+        }
+
+        # Temp files
+        if ($Name -like "~$*") {
+            $Issues += "TempFile → Reason: Temporary Office file → Fix: Close app/delete"
+        }
+
+        # Metadata files
+        if ($File.Extension -in ".ini",".db") {
+            $Issues += "Metadata → Reason: App/system file → Fix: Move outside OneDrive"
+        }
+
+        # Control characters (NOT normal Unicode)
+        if ($Name -match '[\x00-\x1F]') {
+            $Issues += "InvalidUnicode → Reason: Control characters → Fix: Rename"
+        }
+
+        if ($Issues.Count -gt 0) {
+            $IssueCount++
+            "$FullPath --> $($Issues -join ' | ')" | Out-File -Append $Report
+        }
     }
+
+    "Scanned: $ItemCount items" | Out-File -Append $Report
+    "Issues : $IssueCount found" | Out-File -Append $Report
 }
-
-# Get all files
-Get-ChildItem -Path $BaseFolder -Recurse -File | ForEach-Object {
-    $fileName        = $_.Name
-    $fileCharCount   = $fileName.Length
-    $fullPathLength  = $_.FullName.Length
-    $results += [PSCustomObject]@{
-        Type           = "File"
-        Path           = $_.FullName
-        NameCharCount  = $fileCharCount
-        FullPathLength = $fullPathLength
-    }
-}
-
-# Export to CSV
-$results | Export-Csv -Path $OutputCsv -NoTypeInformation -Encoding UTF8
-
-Write-Host "Scan complete. Results saved to $OutputCsv"
 
 }
 
