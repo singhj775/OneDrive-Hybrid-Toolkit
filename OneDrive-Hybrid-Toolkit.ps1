@@ -40,7 +40,7 @@ param(
     [switch]$FileExplorerThumbnail_IconCacheRepair,
 	[switch]$SyncRepair,
 	[switch]$RealTimeMonitor,
-	[switch]$Restore-Default-Folders-Post-OneDrive
+	[switch]$RestoreDefaultFoldersPostOneDrive
     [switch]$NoPrompt
 
 )
@@ -1123,7 +1123,7 @@ function Run-Menu {
             '10' { IconRepair; Pause }
 			'11' { SyncRepair; Pause }
 			"1A" { RealTimeMonitor; pause }
-			"1B" {Restore-Default-Folders-Post-OneDrive; pause}
+			"1B" {RestoreDefaultFoldersPostOneDrive; pause}
 
             '0' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
