@@ -1018,16 +1018,35 @@ function RealTimeMonitor {
 
 
 function RestoreDefaultFoldersPostOneDrive{
+    # --- Logging Setup ---
+    $logFile = "$env:USERPROFILE\ResetShellFolders.log"
+    function Write-Log {
+        param(
+            [string]$Message,
+            [string]$Level = "INFO"
+        )
+        $timestamp = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+        $entry = "[$timestamp] [$Level] $Message"
+        Add-Content -Path $logFile -Value $entry
+        Write-Host $entry
+    }
 
-	    # --- Elevate Script if Not Running as Admin ---
+    Write-Log "Starting Reset-UserShellFolders script"
+
+    # --- Elevate Script if Not Running as Admin ---
     If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-        # Relaunch the script as administrator
+        Write-Log "Not running as admin, relaunching..." "WARN"
         Start-Process powershell.exe "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
         Exit
     }
 
     # --- Stop explorer.exe ---
-    Stop-Process -Name explorer -Force
+    try {
+        Stop-Process -Name explorer -Force
+        Write-Log "Stopped explorer.exe"
+    } catch {
+        Write-Log "Failed to stop explorer.exe: $_" "ERROR"
+    }
     Start-Sleep -Seconds 2
 
     # --- Folder Definitions ---
@@ -1051,34 +1070,47 @@ function RestoreDefaultFoldersPostOneDrive{
         $relativePath = $folders[$regName]
         $fullPath     = Join-Path $env:USERPROFILE $relativePath
 
-        # Create folder if it doesn't exist
         if (-Not (Test-Path $fullPath)) {
             New-Item -ItemType Directory -Path $fullPath | Out-Null
+            Write-Log "Created missing folder: $fullPath"
+        } else {
+            Write-Log "Folder exists: $fullPath"
         }
 
-        # Update registry values for Shell Folders (REG_SZ)
         try {
             Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" `
                 -Name $regName -Value $fullPath -ErrorAction Stop
+            Write-Log "Updated Shell Folders registry for $regName"
         } catch {
-            Write-Warning "Could not write Shell Folders registry for $regName"
+            Write-Log "Could not write Shell Folders registry for $regName: $_" "WARN"
         }
 
-        # Update registry values for User Shell Folders (REG_EXPAND_SZ)
         try {
             Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" `
                 -Name $regName -Value "%USERPROFILE%\$relativePath" -ErrorAction Stop
+            Write-Log "Updated User Shell Folders registry for $regName"
         } catch {
-            Write-Warning "Could not write User Shell Folders registry for $regName"
+            Write-Log "Could not write User Shell Folders registry for $regName: $_" "WARN"
         }
 
-        # Set +r -s -h attributes (recursive)
-        cmd /c "attrib +r -s -h `"$fullPath`" /S /D"
+        try {
+            cmd /c "attrib +r -s -h `"$fullPath`" /S /D"
+            Write-Log "Applied attributes to $fullPath"
+        } catch {
+            Write-Log "Failed to apply attributes to $fullPath: $_" "ERROR"
+        }
     }
 
     # --- Restart Explorer ---
     Start-Sleep -Seconds 1
-    Start-Process explorer.exe
+    try {
+        Start-Process explorer.exe
+        Write-Log "Restarted explorer.exe"
+    } catch {
+        Write-Log "Failed to restart explorer.exe: $_" "ERROR"
+    }
+
+    Write-Log "Completed Reset-UserShellFolders script"
 }
 
 
