@@ -1019,7 +1019,7 @@ function RealTimeMonitor {
 
 function RestoreDefaultFoldersPostOneDrive{
     # --- Logging Setup ---
-    $logFile = "$env:USERPROFILE\ResetShellFolders.log"
+       $logFile = "$env:USERPROFILE\ResetShellFolders.log"
     function Write-Log {
         param(
             [string]$Message,
@@ -1080,24 +1080,24 @@ function RestoreDefaultFoldersPostOneDrive{
         try {
             Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" `
                 -Name $regName -Value $fullPath -ErrorAction Stop
-            Write-Log "Updated Shell Folders registry for $regName"
+            Write-Log "Updated Shell Folders registry for ${regName}"
         } catch {
-            Write-Log "Could not write Shell Folders registry for $regName: $_" "WARN"
+            Write-Log "Could not write Shell Folders registry for ${regName}: $_" "WARN"
         }
 
         try {
             Set-ItemProperty -Path "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" `
                 -Name $regName -Value "%USERPROFILE%\$relativePath" -ErrorAction Stop
-            Write-Log "Updated User Shell Folders registry for $regName"
+            Write-Log "Updated User Shell Folders registry for ${regName}"
         } catch {
-            Write-Log "Could not write User Shell Folders registry for $regName: $_" "WARN"
+            Write-Log "Could not write User Shell Folders registry for ${regName}: $_" "WARN"
         }
 
         try {
             cmd /c "attrib +r -s -h `"$fullPath`" /S /D"
-            Write-Log "Applied attributes to $fullPath"
+            Write-Log "Applied attributes to ${fullPath}"
         } catch {
-            Write-Log "Failed to apply attributes to $fullPath: $_" "ERROR"
+            Write-Log "Failed to apply attributes to ${fullPath}: $_" "ERROR"
         }
     }
 
@@ -1108,6 +1108,33 @@ function RestoreDefaultFoldersPostOneDrive{
         Write-Log "Restarted explorer.exe"
     } catch {
         Write-Log "Failed to restart explorer.exe: $_" "ERROR"
+    }
+
+    # --- Validation Section ---
+    Write-Log "Validating registry and folder paths..."
+    foreach ($regName in $folders.Keys) {
+        $expectedPath = Join-Path $env:USERPROFILE $folders[$regName]
+
+        $shellValue = (Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders" -Name $regName -ErrorAction SilentlyContinue).$regName
+        $userShellValue = (Get-ItemProperty "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\User Shell Folders" -Name $regName -ErrorAction SilentlyContinue).$regName
+
+        if ($shellValue -eq $expectedPath) {
+            Write-Log "Shell Folders registry correct for ${regName}: $shellValue"
+        } else {
+            Write-Log "Shell Folders registry mismatch for ${regName}: $shellValue (expected $expectedPath)" "WARN"
+        }
+
+        if ($userShellValue -eq "%USERPROFILE%\$($folders[$regName])") {
+            Write-Log "User Shell Folders registry correct for ${regName}: $userShellValue"
+        } else {
+            Write-Log "User Shell Folders registry mismatch for ${regName}: $userShellValue (expected %USERPROFILE%\$($folders[$regName]))" "WARN"
+        }
+
+        if (Test-Path $expectedPath) {
+            Write-Log "Folder exists for ${regName}: $expectedPath"
+        } else {
+            Write-Log "Folder missing for ${regName}: $expectedPath" "ERROR"
+        }
     }
 
     Write-Log "Completed Reset-UserShellFolders script"
