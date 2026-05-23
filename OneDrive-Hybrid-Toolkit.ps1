@@ -1017,7 +1017,7 @@ function RealTimeMonitor {
 }
 
 
-function Restore-Default-Folders-Post-OneDrive{
+function RestoreDefaultFoldersPostOneDrive{
 	﻿# --- Elevate Script if Not Running as Admin ---
 If (-NOT ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
     # Relaunch the script as administrator
