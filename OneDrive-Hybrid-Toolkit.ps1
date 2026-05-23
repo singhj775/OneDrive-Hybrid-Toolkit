@@ -347,7 +347,7 @@ function Confirm-DeleteFiles {
         Write-Host "`nWARNING: Delete personal OneDrive folder?" -ForegroundColor Red
         Write-Host "Path: $env:USERPROFILE\OneDrive" -ForegroundColor Yellow
         Write-Host "Type YES to confirm" -ForegroundColor Yellow
-        $c = Read-Host ""
+        $c = Read-Host "Confirmation"
         if ($c -ne 'YES') { Write-Log "Cancelled by user" 'WARN'; return $false }
         return $true
     }
