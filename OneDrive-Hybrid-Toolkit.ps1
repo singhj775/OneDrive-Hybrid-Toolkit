@@ -40,7 +40,7 @@ param(
     [switch]$FileExplorerThumbnail_IconCacheRepair,
 	[switch]$SyncRepair,
 	[switch]$RealTimeMonitor,
-	[switch]$RestoreDefaultFoldersPostOneDrive
+	[switch]$RestoreDefaultFoldersPostOneDrive,
     [switch]$NoPrompt
 
 )
