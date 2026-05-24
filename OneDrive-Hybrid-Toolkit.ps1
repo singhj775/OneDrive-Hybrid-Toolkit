@@ -41,6 +41,7 @@ param(
 	[switch]$SyncRepair,
 	[switch]$RealTimeMonitor,
 	[switch]$RestoreDefaultFoldersPostOneDrive,
+	[switch]$JunctionRemover,
     [switch]$NoPrompt
 
 )
@@ -1140,6 +1141,63 @@ function RestoreDefaultFoldersPostOneDrive{
     Write-Log "Completed Reset-UserShellFolders script"
 }
 
+# ===== Junction Remover =====
+function JunctionRemover {
+    param (
+        [string[]]$Folders = @("Desktop","Documents","Downloads","Music","Pictures","Videos"),
+        [string]$UserProfile = $env:USERPROFILE,
+        [string]$OneDrivePath = $env:OneDrive,
+        [string]$LogFile = "$env:USERPROFILE\MoveJunctionLog_$(Get-Date -Format 'yyyy-MM-dd_HH-mm-ss').txt"
+    )
+
+    # Start log file
+    Add-Content -Path $LogFile -Value "=== Move-AndJunctionUserFolders Log Started $(Get-Date) ==="
+
+    foreach ($folder in $Folders) {
+        $userFolder = Join-Path $UserProfile $folder
+        $oneDriveFolder = Join-Path $OneDrivePath $folder
+
+        if ((Test-Path $userFolder) -and -not ((Get-Item $userFolder).Attributes.ToString().Contains("ReparsePoint"))) {
+            
+            # Safety check: see if any process is locking files in this folder
+            $inUse = Get-Process | ForEach-Object {
+                try {
+                    $_.Modules | Where-Object { $_.FileName -like "$userFolder*" }
+                } catch { }
+            }
+
+            if ($inUse) {
+                $msg = "⚠ Skipped $folder because it is currently in use."
+                Write-Warning $msg
+                Add-Content -Path $LogFile -Value $msg
+                continue
+            }
+
+            # Ensure OneDrive folder exists
+            New-Item -Path $oneDriveFolder -ItemType Directory -Force -ErrorAction SilentlyContinue
+
+            # Move contents
+            Move-Item -Path "$userFolder\*" -Destination $oneDriveFolder -Force -ErrorAction SilentlyContinue
+
+            # Create junction
+            New-Item -ItemType Junction -Path $userFolder -Value $oneDriveFolder -Force -ErrorAction SilentlyContinue
+
+            $msg = "✔ Moved and linked $folder"
+            Write-Host $msg
+            Add-Content -Path $LogFile -Value $msg
+        }
+        else {
+            $msg = "ℹ Skipped $folder (already junction or missing)"
+            Write-Host $msg
+            Add-Content -Path $LogFile -Value $msg
+        }
+    }
+
+    Add-Content -Path $LogFile -Value "=== Log Ended $(Get-Date) ==="
+    Write-Host "📂 Log saved to $LogFile"
+}
+
+
 
 # ===== Menu =====
 function Show-Menu {
@@ -1160,7 +1218,8 @@ function Show-Menu {
     Write-Host "10. Icon repair"
 	Write-Host "11. Sync repair"
 	Write-Host "1A. RealTime Folder Monitor"
-	Write-Host "1B. Restore-Default-Folders-Post-OneDrive "
+	Write-Host "1B. Restore-Default-Folders-Post-OneDrive"
+	Write-Host "1C. Junction Remover"
     Write-Host "0. Exit"
     Write-Host ""
 }
@@ -1183,12 +1242,14 @@ function Run-Menu {
 			'11' { SyncRepair; Pause }
 			"1A" { RealTimeMonitor; pause }
 			"1B" {RestoreDefaultFoldersPostOneDrive; pause}
-
+			"1C" {JunctionRemover; pause }
             '0' { Write-Host "Exiting"; return }
             default { Write-Host "Invalid"; Start-Sleep 1 }
         }
     } while ($true)
 }
+
+
 
 # ===== Main Entry =====
 Write-Log "Toolkit Started" 'INFO'
