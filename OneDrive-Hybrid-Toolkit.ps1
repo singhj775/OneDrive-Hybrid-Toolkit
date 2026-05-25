@@ -215,7 +215,92 @@ function Remove-AppX {
         }
         Write-Log "Provisioned AppX removed" 'SUCCESS'
     } catch { Write-Log "No provisioned AppX found" 'INFO' }
+
+
+	Write-Log "Starting OneDrive AppX cleanup and re-registration..." 'INFO'
+ 
+try {
+    Write-Output "Removing OneDriveSync AppX package..."
+ 
+    $packages = Get-AppxPackage *OneDriveSync* -AllUsers -ErrorAction Stop
+ 
+    if ($packages) {
+        foreach ($pkg in $packages) {
+            try {
+                Remove-AppxPackage -Package $pkg.PackageFullName -AllUsers -ErrorAction Stop
+                Write-Log "Successfully removed package: $($pkg.PackageFullName)" 'SUCCESS'
+            }
+            catch {
+                Write-Log "Failed to remove package: $($pkg.PackageFullName). Error: $($_.Exception.Message)" 'WARN'
+            }
+        }
+    }
+    else {
+        Write-Log "No OneDriveSync AppX packages found." 'INFO'
+    }
 }
+catch {
+    Write-Log "Error while fetching/removing AppX package: $($_.Exception.Message)" 'ERROR'
+}
+ 
+try {
+    Write-Log "Cleaning leftover ApplicationData folder..." 'INFO'
+ 
+    $path = "C:\ProgramData\Microsoft\Windows\AppRepository\Families\ApplicationData\Microsoft.OneDriveSync_8wekyb3d8bbwe"
+ 
+    if (Test-Path $path) {
+        Remove-Item -Recurse -Force $path -ErrorAction Stop
+        Write-Log "Successfully removed folder: $path" 'SUCCESS'
+    }
+    else {
+        Write-Log "Path not found, skipping cleanup: $path" 'INFO'
+    }
+}
+catch {
+    Write-Log "Failed to clean ApplicationData folder: $($_.Exception.Message)" 'WARN'
+}
+ 
+try {
+    Write-Log "Re-registering all AppX packages..." 'INFO'
+ 
+    Get-AppXPackage -AllUsers -ErrorAction Stop | ForEach-Object {
+        try {
+            Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -ErrorAction Stop
+        }
+        catch {
+            Write-Log "Failed to register package: $($_.Name). Error: $($_.Exception.Message)" 'WARN'
+        }
+    }
+ 
+    Write-Log "AppX re-registration completed." 'SUCCESS'
+}
+catch {
+    Write-Log "Error during AppX re-registration: $($_.Exception.Message)" 'WARN'
+}
+ 
+try {
+    Write-Log "Verifying remaining OneDriveSync packages..." 'INFO'
+ 
+    $remaining = Get-AppxPackage *OneDriveSync* -AllUsers -ErrorAction Stop
+ 
+    if ($remaining) {
+        Write-Log "Some OneDriveSync packages still exist:" 'WARN'
+        $remaining | Select Name, PackageFullName
+    }
+    else {
+        Write-Log "No OneDriveSync packages found. Cleanup successful." 'SUCCESS'
+    }
+}
+catch {
+    Write-Log "Error during final verification: $($_.Exception.Message)" 'WARN'
+}
+ 
+Write-Log "Script execution completed." 'SUCCESS'
+
+
+	
+}
+
 
 # ===== Registry Cleanup =====
 function Clean-Registry {
