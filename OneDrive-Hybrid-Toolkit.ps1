@@ -260,23 +260,23 @@ catch {
     Write-Log "Failed to clean ApplicationData folder: $($_.Exception.Message)" 'WARN'
 }
  
-try {
-    Write-Log "Re-registering all AppX packages..." 'INFO'
+# try {
+#     Write-Log "Re-registering all AppX packages..." 'INFO'
  
-    Get-AppXPackage -AllUsers -ErrorAction Stop | ForEach-Object {
-        try {
-            Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -ErrorAction Stop
-        }
-        catch {
-            Write-Log "Failed to register package: $($_.Name). Error: $($_.Exception.Message)" 'WARN'
-        }
-    }
+#     Get-AppXPackage -AllUsers -ErrorAction Stop | ForEach-Object {
+#         try {
+#             Add-AppxPackage -DisableDevelopmentMode -Register "$($_.InstallLocation)\AppXManifest.xml" -ErrorAction Stop
+#         }
+#         catch {
+#             Write-Log "Failed to register package: $($_.Name). Error: $($_.Exception.Message)" 'WARN'
+#         }
+#     }
  
-    Write-Log "AppX re-registration completed." 'SUCCESS'
-}
-catch {
-    Write-Log "Error during AppX re-registration: $($_.Exception.Message)" 'WARN'
-}
+#     Write-Log "AppX re-registration completed." 'SUCCESS'
+# }
+# catch {
+#     Write-Log "Error during AppX re-registration: $($_.Exception.Message)" 'WARN'
+# }
  
 try {
     Write-Log "Verifying remaining OneDriveSync packages..." 'INFO'
