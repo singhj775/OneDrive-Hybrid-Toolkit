@@ -486,6 +486,8 @@ function Do-Reinstall {
         "$env:ProgramFiles\Microsoft OneDrive\OneDriveStandaloneUpdater.exe"
     )
 
+	sc start cldflt
+
     foreach ($path in $updaterPaths) {
         if (Test-Path $path) {
             Rename-Item $path "$path.bak" -Force
@@ -628,17 +630,21 @@ foreach ($setup in $SetupPaths) {
 #----------------------------------------------------------
 Write-Step "Starting OneDrive"
 
+icacls "$env:USERPROFILE\OneDrive"
+icacls "$env:USERPROFILE\OneDrive" /reset /t /c
+fsutil reparsepoint query "$env:USERPROFILE\OneDrive"
+
 $PossiblePaths = @(
-    "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe",
-    "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe",
-    "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe"
+    "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe /verbose",
+    "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe /verbose",
+    "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe /verbose"
 )
 
 $Started = $false
 
 foreach ($path in $PossiblePaths) {
     if (Test-Path $path) {
-        Start-Process $path
+		Start-Process $path -Verb RunAsUser
         Write-Host "OneDrive started from: $path" -ForegroundColor Green
         $Started = $true
         break
@@ -650,6 +656,11 @@ if (-not $Started) {
 }
 
 Write-Host " OneDrive Repair Completed" -ForegroundColor Green
+netstat -bno | findstr OneDrive
+Start-Sleep -Seconds 5
+Test-NetConnection onedrive.live.com -Port 443
+Test-NetConnection api.onedrive.com -Port 443
+Test-NetConnection login.live.com -Port 443
 Write-Host "Log saved at: $LogFile" -ForegroundColor Cyan
 
 Stop-Transcript
