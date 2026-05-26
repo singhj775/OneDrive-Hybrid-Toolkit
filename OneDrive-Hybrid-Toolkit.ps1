@@ -758,6 +758,8 @@ OneDrive Version: $ODVersion
         return
     }
     Write-Host "Found $($AllLogs.Count) log files." -ForegroundColor Green
+	Get-ChildItem "$env:LOCALAPPDATA\Microsoft\OneDrive\logs\Personal" -Recurse
+	
 
     # =========================
     # Parse Common Issues
