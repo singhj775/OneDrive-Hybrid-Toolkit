@@ -791,9 +791,9 @@ $fodKey = "HKCU:\Software\Microsoft\OneDrive"
 	Write-Log "Starting OneDrive"
 
 $PossiblePaths = @(
-    "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe /verbose",
-    "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe /verbose",
-    "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe /verbose"
+    "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe",
+    "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe",
+    "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe"
 )
 
 $Started = $false
