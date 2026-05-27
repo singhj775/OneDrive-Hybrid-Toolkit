@@ -628,7 +628,7 @@ foreach ($setup in $SetupPaths) {
 #----------------------------------------------------------
 # 9. Restart OneDrive (Smart Detection)
 #----------------------------------------------------------
-Write-Step "Starting OneDrive"
+Write-Log "Starting OneDrive"
 
 icacls "$env:USERPROFILE\OneDrive"
 icacls "$env:USERPROFILE\OneDrive" /reset /t /c
@@ -788,7 +788,7 @@ $fodKey = "HKCU:\Software\Microsoft\OneDrive"
 
   	Start-Sleep -Seconds 5 
 
-	Write-Step "Starting OneDrive"
+	Write-Log "Starting OneDrive"
 
 $PossiblePaths = @(
     "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe /verbose",
