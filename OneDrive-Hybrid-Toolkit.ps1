@@ -788,9 +788,34 @@ $fodKey = "HKCU:\Software\Microsoft\OneDrive"
 
   	Start-Sleep -Seconds 5 
 
+	Write-Step "Starting OneDrive"
+
+$PossiblePaths = @(
+    "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe /verbose",
+    "$env:ProgramFiles\Microsoft OneDrive\OneDrive.exe /verbose",
+    "$env:ProgramFiles(x86)\Microsoft OneDrive\OneDrive.exe /verbose"
+)
+
+$Started = $false
+
+foreach ($path in $PossiblePaths) {
+    if (Test-Path $path) {
+		Start-Process $path -Verb RunAsUser
+        Write-Host "OneDrive started from: $path" -ForegroundColor Green
+        $Started = $true
+        break
+    }
+}
+
+if (-not $Started) {
+    Write-Host "OneDrive executable not found. Reinstall may have failed." -ForegroundColor Red
+}
+
+
 
     Write-Log "Icon repair completed..." 'SUCCESS'
 	ie4uinit.exe -show
+	
 
 	
 }
