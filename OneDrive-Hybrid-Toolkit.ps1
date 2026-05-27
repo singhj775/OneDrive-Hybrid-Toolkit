@@ -669,47 +669,25 @@ Stop-Transcript
 
 
 # # ===== Icon Repair =====
-# function IconRepair {
-#     ie4uinit.exe -show
-#     taskkill /IM explorer.exe /F
-#     Stop-Process -Name explorer -Force
-
-#     Remove-Item "$env:APPDATA\Microsoft\Windows\Recent\AutomaticDestinations\f01b4d95cf55d32a*" -Force -ErrorAction SilentlyContinue
-#     del %AppData%\Microsoft\Windows\Recent\AutomaticDestinations\*
-
-
-
-#     # Delete icon cache files properly in PowerShell
-#     Remove-Item "$env:localappdata\IconCache.db" -Force -ErrorAction SilentlyContinue
-#     Remove-Item "$env:localappdata\Microsoft\Windows\Explorer\iconcache*" -Force -Recurse -ErrorAction SilentlyContinue
-
-#     start explorer.exe
-
-#     $path = "$env:USERPROFILE\OneDrive\Personal Vault"
-# try {
-#     [System.IO.Directory]::GetFiles($path) | Out-Null
-#     Write-Host "ACCESS GRANTED (Vault should be locked)" -ForegroundColor Red
-# } catch {
-#     Write-Host "ACCESS DENIED (Expected when locked): $($_.Exception.Message)" -ForegroundColor Green
-# }
-
-#     Write-Log "Icon repair completed..." 'SUCCESS'
-# }
 function IconRepair {
- 
-    Write-Host "Stopping Explorer and OneDrive..." -ForegroundColor Yellow
- 
-    # Stop processes cleanly
-    Stop-Process -Name explorer -Force -ErrorAction SilentlyContinue
-    Stop-Process -Name onedrive -Force -ErrorAction SilentlyContinue
- 
-    Start-Sleep -Seconds 2
- 
- 
-    # -------------------------------
-    # Step 2: Clear OneDrive cache
-    # -------------------------------
-    Write-Host "Clearing OneDrive cache..." -ForegroundColor Cyan
+	taskkill /IM explorer.exe /F
+    Stop-Process -Name explorer -Force
+	Stop-Process -Name onedrive -Force -ErrorAction SilentlyContinue
+
+	Start-Sleep -Seconds 5 
+
+    # ie4uinit.exe -show
+    
+    Remove-Item "$env:APPDATA\Microsoft\Windows\Recent\AutomaticDestinations\f01b4d95cf55d32a*" -Force -ErrorAction SilentlyContinue
+    del %AppData%\Microsoft\Windows\Recent\AutomaticDestinations\*
+
+
+
+    # Delete icon cache files properly in PowerShell
+    Remove-Item "$env:localappdata\IconCache.db" -Force -ErrorAction SilentlyContinue
+    Remove-Item "$env:localappdata\Microsoft\Windows\Explorer\iconcache*" -Force -Recurse -ErrorAction SilentlyContinue
+
+	Write-Host "Clearing OneDrive cache..." -ForegroundColor Cyan
  
     $odPaths = @(
         "$env:LOCALAPPDATA\Microsoft\OneDrive\settings",
@@ -721,13 +699,8 @@ function IconRepair {
             Remove-Item $path -Recurse -Force -ErrorAction SilentlyContinue
         }
     }
- 
-    # -------------------------------
-    # Step 3: Clear Thumbnail + Icon Cache
-    # -------------------------------
-    Write-Host "Clearing thumbnail & icon cache..." -ForegroundColor Cyan
- 
-    # Thumbnail cache
+
+	 # Thumbnail cache
     Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Explorer" -Include "thumbcache*.db" -Force -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
  
@@ -735,11 +708,8 @@ function IconRepair {
     Remove-Item "$env:LOCALAPPDATA\IconCache.db" -Force -ErrorAction SilentlyContinue
     Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Explorer" -Include "iconcache*" -Force -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
- 
-    # -------------------------------
-    # Step 4: Ensure thumbnails enabled
-    # -------------------------------
-    Write-Host "Fixing thumbnail settings..." -ForegroundColor Cyan
+
+ 	 Write-Host "Fixing thumbnail settings..." -ForegroundColor Cyan
  
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
         -Name IconsOnly -Value 0 -ErrorAction SilentlyContinue
@@ -747,39 +717,18 @@ function IconRepair {
     Set-ItemProperty -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\Advanced" `
         -Name DisableThumbnails -Value 0 -ErrorAction SilentlyContinue
  
-    # -------------------------------
-    # Step 5: Restart Explorer
-    # -------------------------------
-    Write-Host "Restarting Explorer..." -ForegroundColor Cyan
-    Start-Process explorer.exe
- 
-    Start-Sleep -Seconds 3
- 
-    # -------------------------------
-    # Step 6: Restart OneDrive
-    # -------------------------------
-    Write-Host "Restarting OneDrive..." -ForegroundColor Cyan
-    if (Test-Path $oneDriveExe) {
-        Start-Process $oneDriveExe
-    }
- 
-    # -------------------------------
-    # Optional: Personal Vault Check
-    # -------------------------------
+
+    # start explorer.exe
+
     $path = "$env:USERPROFILE\OneDrive\Personal Vault"
-    try {
-        [System.IO.Directory]::GetFiles($path) | Out-Null
-        Write-Host "ACCESS GRANTED (Vault should be locked)" -ForegroundColor Red
-    } catch {
-        Write-Host "ACCESS DENIED (Expected when locked): $($_.Exception.Message)" -ForegroundColor Green
-    }
- 
-    Write-Host "Checking Files On-Demand status..." -ForegroundColor Cyan
- 
-    # ---------------------------------------
-    # Step 1: Check Files On-Demand setting
-    # ---------------------------------------
-    $fodKey = "HKCU:\Software\Microsoft\OneDrive"
+try {
+    [System.IO.Directory]::GetFiles($path) | Out-Null
+    Write-Host "ACCESS GRANTED (Vault should be locked)" -ForegroundColor Red
+} catch {
+    Write-Host "ACCESS DENIED (Expected when locked): $($_.Exception.Message)" -ForegroundColor Green
+}
+
+$fodKey = "HKCU:\Software\Microsoft\OneDrive"
     $fodValue = Get-ItemProperty -Path $fodKey -Name "FilesOnDemandEnabled" -ErrorAction SilentlyContinue
  
     if ($fodValue.FilesOnDemandEnabled -eq 1) {
@@ -789,11 +738,8 @@ function IconRepair {
         Write-Host "Files On-Demand is DISABLED" -ForegroundColor Green
         $fodEnabled = $false
     }
- 
-    # ---------------------------------------
-    # Step 2: Scan OneDrive folder attributes
-    # ---------------------------------------
-    $oneDrivePath = "$env:USERPROFILE\OneDrive"
+
+	$oneDrivePath = "$env:USERPROFILE\OneDrive"
  
     if (!(Test-Path $oneDrivePath)) {
         Write-Host "OneDrive folder not found!" -ForegroundColor Red
@@ -818,12 +764,10 @@ function IconRepair {
     }
  
     Write-Host "Sample checked: $totalChecked files"
+
     Write-Host "Cloud/partial files detected: $cloudFiles"
  
-    # ---------------------------------------
-    # Step 3: Evaluate
-    # ---------------------------------------
-    if ($fodEnabled -and $cloudFiles -gt 10) {
+	  if ($fodEnabled -and $cloudFiles -gt 10) {
         Write-Host "LIKELY ROOT CAUSE: Files On-Demand impacting thumbnails" -ForegroundColor Red
         Write-Host "Recommendation:" -ForegroundColor Yellow
         Write-Host " - Disable Files On-Demand"
@@ -839,8 +783,17 @@ function IconRepair {
  
  
     Write-Host "Icon + Thumbnail repair completed..." -ForegroundColor Green
-}
 
+	start explorer.exe
+
+  	Start-Sleep -Seconds 5 
+
+
+    Write-Log "Icon repair completed..." 'SUCCESS'
+	ie4uinit.exe -show
+
+	
+}
 
 
 
