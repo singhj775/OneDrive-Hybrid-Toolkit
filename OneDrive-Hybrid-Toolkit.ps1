@@ -696,7 +696,6 @@ Stop-Transcript
 #     Write-Log "Icon repair completed..." 'SUCCESS'
 # }
 function IconRepair {
-	function IconRepair {
  
     Write-Host "Stopping Explorer and OneDrive..." -ForegroundColor Yellow
  
@@ -840,9 +839,6 @@ function IconRepair {
  
  
     Write-Host "Icon + Thumbnail repair completed..." -ForegroundColor Green
-}
- 
-
 }
 
 
