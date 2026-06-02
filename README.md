@@ -74,14 +74,6 @@ Show current status
 ```
 🔐 Administrator rights required: The script will auto-relaunch as Admin if needed.
 
-🚀 How to Use This Tool (3 Easy Steps)
-Save the File: Make sure the OneDrive-Hybrid-Toolkit.ps1 file is saved to your computer (e.g., on your Desktop or in your Downloads folder).
-Run as Administrator:
-Right-click on the OneDrive-Hybrid-Toolkit.ps1 file.
-Select "Run with PowerShell".
-If a blue window pops up asking for permission, click "Yes". (The tool needs Administrator permission to make system changes).
-Use the Menu: A simple, numbered menu will appear on your screen. Just type the number of the option you want and press Enter.
-
 
 | Option | Feature Name | What it does (Plain English) |
 | :--- | :--- | :--- |
@@ -118,6 +110,58 @@ Designed for deep diagnostics, incident analysis, and troubleshooting OneDrive /
 
 
 ---
+
+# 🌐 OneDrive Network Trace & Fiddler Configuration Tool
+
+A PowerShell menu-driven utility designed to simplify network troubleshooting for Microsoft OneDrive. This tool automates WinHTTP proxy routing, disables HTTP/3 (QUIC) to force readable traffic, and captures simultaneous `netsh` (`.etl`) and Fiddler (`.saz`) network traces.
+
+---
+
+## ⚠️ Prerequisites
+
+Before using this tool, ensure you have the following:
+- **Windows OS** (Windows 10 / 11 / Server)
+- **Administrator Privileges** (The script will automatically check and exit if not run as Admin)
+- **[Fiddler Classic](https://www.telerik.com/fiddler/fiddler-classic)** installed *(Required for Option 4 to export `.saz` files via FiddlerCore)*
+
+---
+
+## 🚀 Quick Start
+
+1. Download the `OneDriveTraceTool.ps1` script to your local machine.
+2. Right-click the file and select **Properties**. If there is an "Unblock" checkbox at the bottom, check it and click **Apply**.
+3. Open **PowerShell as Administrator**.
+4. Navigate to the folder containing the script.
+5. Run the script:
+   ```powershell
+   .\OneDriveTraceTool.ps1
+
+
+🛠️ Features & Menu Options
+[1] Bypass System Proxy and Route to Fiddler
+Configures the Windows WinHTTP proxy to route traffic through 127.0.0.1:8888. This ensures that background services (like OneDrive) send their traffic to Fiddler for inspection, bypassing standard IE/Edge proxy settings.
+[2] Disable HTTP/3 and QUIC (Force HTTP/1.1/2)
+Modifies the Windows Registry to disable EnableAutoHttp3 and force EnableHttp2Tls.
+💡 Why? OneDrive heavily utilizes QUIC (UDP port 443), which is encrypted and difficult to decrypt in standard packet captures. Forcing HTTP/2 over TLS allows Fiddler to decrypt and inspect the traffic.
+Note: You must restart OneDrive after applying this change.
+[3] Revert All Changes
+Cleans up the system by:
+Resetting the WinHTTP proxy to direct connection.
+Removing the HTTP/2 and HTTP/3 registry keys.
+Attempting to remove the DO_NOT_TRUST_FiddlerRoot certificate from the Trusted Root Certification Authorities store.
+[4] Start Dual Capture (netsh .etl + Fiddler .saz)
+The core troubleshooting feature. It performs the following:
+Creates an output directory: C:\OneDriveTraces\
+Starts a Windows netsh trace (.etl + .cab).
+Loads FiddlerCore.dll to start capturing sessions in the background.
+Prompts you to reproduce your OneDrive issue (e.g., sync conflicts, Personal Vault unlocks, upload failures).
+Stops both captures upon pressing Enter and exports the .saz archive.
+[5] Exit
+Safely closes the script.
+
+This script modifies system network settings and Windows Registry keys. While it includes a "Revert" function to clean up after itself, it is provided as-is. Always ensure you understand the changes being made to your system before executing administrative scripts. The author is not responsible for any unintended side effects.
+
+
 
 ## 🛠 What This crosslink extension Script Does
 
