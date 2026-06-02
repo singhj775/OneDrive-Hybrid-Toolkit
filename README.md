@@ -14,6 +14,7 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 > ✅ **PowerShell 5.1 compatible**: Runs on all default Windows installations  
 > ✅ **Self-updating**: Check for updates via `-CheckForUpdate` or `-UpdateSelf`  
 > ✅ **Dual interface**: Interactive menu for beginners, CLI switches for automation
+
 > 🛡️ Safe by Default: This tool will never delete your files stored in the cloud. It only affects the OneDrive application and files on this specific computer. Your personal files are kept safe unless you explicitly choose the "Delete My Files" option.
 
 
