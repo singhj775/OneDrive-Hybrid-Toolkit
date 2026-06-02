@@ -1,3 +1,5 @@
+Welcome! This toolkit is a simple, safe, and automated way to manage OneDrive on your computer. Whether you want to completely remove OneDrive, fix syncing errors, or restore your folders, this tool does the heavy lifting for you.
+
 # OneDrive-Hybrid-Toolkit
 PowerShell toolkit to safely remove/reinstall Microsoft OneDrive
 # OneDrive Hybrid Toolkit 🧹
@@ -11,7 +13,9 @@ A production-ready PowerShell toolkit to **safely remove or reinstall Microsoft 
 > ✅ **Safe by default**: Never deletes your personal files without explicit confirmation  
 > ✅ **PowerShell 5.1 compatible**: Runs on all default Windows installations  
 > ✅ **Self-updating**: Check for updates via `-CheckForUpdate` or `-UpdateSelf`  
-> ✅ **Dual interface**: Interactive menu for beginners, CLI switches for automation  
+> ✅ **Dual interface**: Interactive menu for beginners, CLI switches for automation
+> 🛡️ Safe by Default: This tool will never delete your files stored in the cloud. It only affects the OneDrive application and files on this specific computer. Your personal files are kept safe unless you explicitly choose the "Delete My Files" option.
+
 
 ---
 
@@ -69,6 +73,33 @@ Show current status
 ```
 🔐 Administrator rights required: The script will auto-relaunch as Admin if needed.
 
+🚀 How to Use This Tool (3 Easy Steps)
+Save the File: Make sure the OneDrive-Hybrid-Toolkit.ps1 file is saved to your computer (e.g., on your Desktop or in your Downloads folder).
+Run as Administrator:
+Right-click on the OneDrive-Hybrid-Toolkit.ps1 file.
+Select "Run with PowerShell".
+If a blue window pops up asking for permission, click "Yes". (The tool needs Administrator permission to make system changes).
+Use the Menu: A simple, numbered menu will appear on your screen. Just type the number of the option you want and press Enter.
+
+
+| Option | Feature Name | What it does (Plain English) |
+| :--- | :--- | :--- |
+| **1** | Remove OneDrive (Safe) | Uninstalls the app but keeps your downloaded files safe. |
+| **2** | Remove + Deep Clean | Uninstalls the app and removes hidden leftover settings. |
+| **3** | Remove + Delete My Files | ⚠️ **WARNING:** Uninstalls the app AND deletes the local OneDrive folder on this PC. |
+| **4** | Reinstall OneDrive | Installs or restores the OneDrive application. |
+| **5** | Block Reinstall (Policy) | Stops Windows from automatically reinstalling OneDrive in the background. |
+| **6** | ODC CPU Monitor | A live dashboard that restarts OneDrive if it freezes or uses too much memory. |
+| **7** | Character Count Checker | Scans for files with names that are too long or have weird characters that break syncing. |
+| **8** | New Local User Account | Creates a temporary local administrator account named "test" (for advanced troubleshooting). |
+| **9** | Logs Collection | Gathers error logs, analyzes them for common problems, and creates a neat ZIP file for IT support. |
+| **10** | Icon Repair | Fixes broken, missing, or blank icons for OneDrive or File Explorer. |
+| **11** | Sync Repair | A complete "reset" for OneDrive. Clears cache, fixes network settings, and reinstalls cleanly. |
+| **1A** | Real-Time Folder Monitor | Watches your OneDrive folder and prints a message whenever a file is added or changed. |
+| **1B** | Restore Default Folders | Fixes your Desktop, Documents, Pictures, etc., if they disappeared after removing OneDrive. |
+| **1C** | Junction Remover | Safely moves your Desktop/Documents folders out of OneDrive and back to your local computer. |
+| **0** | Exit | Closes the toolkit. |
+
 
 # Windows Event Export Toolkit
 
@@ -84,17 +115,6 @@ Designed for deep diagnostics, incident analysis, and troubleshooting OneDrive /
 
 ---
 
-# Windows Event & OneDrive Diagnostic Export Tool
-
-A comprehensive PowerShell diagnostic script that exports:
-
-- 🔐 Biometric & Personal Vault events  
-- ☁️ OneDrive sync conflicts & error codes  
-- 🛡️ Security audit events  
-- 💻 System service & driver events  
-- 📂 Internal OneDrive log analysis  
-
-Designed for troubleshooting, audit analysis, and deep diagnostics of Windows authentication and OneDrive issues.
 
 ---
 
