@@ -140,15 +140,18 @@ Before using this tool, ensure you have the following:
 🛠️ Features & Menu Options
 [1] Bypass System Proxy and Route to Fiddler
 Configures the Windows WinHTTP proxy to route traffic through 127.0.0.1:8888. This ensures that background services (like OneDrive) send their traffic to Fiddler for inspection, bypassing standard IE/Edge proxy settings.
+
 [2] Disable HTTP/3 and QUIC (Force HTTP/1.1/2)
 Modifies the Windows Registry to disable EnableAutoHttp3 and force EnableHttp2Tls.
 💡 Why? OneDrive heavily utilizes QUIC (UDP port 443), which is encrypted and difficult to decrypt in standard packet captures. Forcing HTTP/2 over TLS allows Fiddler to decrypt and inspect the traffic.
 Note: You must restart OneDrive after applying this change.
+
 [3] Revert All Changes
 Cleans up the system by:
 Resetting the WinHTTP proxy to direct connection.
 Removing the HTTP/2 and HTTP/3 registry keys.
 Attempting to remove the DO_NOT_TRUST_FiddlerRoot certificate from the Trusted Root Certification Authorities store.
+
 [4] Start Dual Capture (netsh .etl + Fiddler .saz)
 The core troubleshooting feature. It performs the following:
 Creates an output directory: C:\OneDriveTraces\
@@ -156,6 +159,7 @@ Starts a Windows netsh trace (.etl + .cab).
 Loads FiddlerCore.dll to start capturing sessions in the background.
 Prompts you to reproduce your OneDrive issue (e.g., sync conflicts, Personal Vault unlocks, upload failures).
 Stops both captures upon pressing Enter and exports the .saz archive.
+
 [5] Exit
 Safely closes the script.
 
