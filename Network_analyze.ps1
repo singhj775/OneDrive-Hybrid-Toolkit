@@ -153,7 +153,7 @@ do {
         "3" { Revert-Changes }
         "4" { Start-DualCapture }
         "5" { 
-            Write-Host "`nExiting script. Happy troubleshooting!" -ForegroundColor Cyan
+            Write-Host "`nExiting script.!" -ForegroundColor Cyan
             break 
         }
         default { 
