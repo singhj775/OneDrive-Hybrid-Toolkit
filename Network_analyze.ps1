@@ -23,7 +23,7 @@ function Show-Menu {
     Write-Host "  [2] Disable HTTP/3 and QUIC (Force HTTP/1.1/2)"
     Write-Host "  [3] Revert All Changes (Proxy, QUIC, Fiddler Cert)"
     Write-Host "  [4] Start Dual Capture (netsh .etl + Fiddler .saz)"
-    Write-Host "  [5] Troubleshoot network (Check registry, GPO)"
+    Write-Host "  [5] Troubleshoot network (Registry, GPO)"
     Write-Host "  [6] Exit"
     Write-Host "==================================================" -ForegroundColor Cyan
 }
@@ -490,7 +490,7 @@ do {
         "2" { Disable-Http3Quic }
         "3" { Revert-Changes }
         "4" { Start-DualCapture }
-        "5" { Start-OneDriveInteractiveHealthChec }
+        "5" { Start-OneDriveInteractiveHealthCheck }
         "6" { 
             Write-Host "`nExiting script.!" -ForegroundColor Cyan
             break 
