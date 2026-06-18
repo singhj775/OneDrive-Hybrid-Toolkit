@@ -477,7 +477,7 @@ function Start-OneDriveInteractiveHealthCheck {
 }
 
 # Run the interactive wrapper
-Start-OneDriveInteractiveHealthCheck
+# Start-OneDriveInteractiveHealthCheck
 
 
 # === MAIN MENU LOOP ===
@@ -490,7 +490,7 @@ do {
         "2" { Disable-Http3Quic }
         "3" { Revert-Changes }
         "4" { Start-DualCapture }
-        "5" { Invoke-OneDriveDeepHealthCheck }
+        "5" { Start-OneDriveInteractiveHealthChec }
         "6" { 
             Write-Host "`nExiting script.!" -ForegroundColor Cyan
             break 
