@@ -496,8 +496,8 @@ do {
             break 
         }
         default { 
-            Write-Host "`nInvalid option. Please select 1-5." -ForegroundColor Red
+            Write-Host "`nInvalid option. Please select 1-6." -ForegroundColor Red
             Start-Sleep -Seconds 1
         }
     }
-} while ($choice -ne "5")
+} while ($choice -ne "6")
