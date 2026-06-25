@@ -33,6 +33,8 @@ powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubus
 
 powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/crosslinked_extension_fix.ps1 -OutFile $env:TEMP\crosslinked_extension_fix.ps1; & $env:TEMP\crosslinked_extension_fix.ps1"
 
+powershell -ExecutionPolicy Bypass -NoProfile -Command "iwr https://raw.githubusercontent.com/singhj775/OneDrive-Hybrid-Toolkit/main/deletion_detection.ps1 -OutFile $env:TEMP\deletion_detection.ps1; & $env:TEMP\deletion_detection.ps1 -DaysBack 100"
+
 ```
 ---
 
