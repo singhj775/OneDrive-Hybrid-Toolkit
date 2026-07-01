@@ -1425,8 +1425,7 @@ function JunctionRemover {
 ===== Logs Collection (Deep Dive .CAB) =====
 function Collect-LogsInCab {
     param (
-        [string]$OutputDir = "$env:USERPROFILE\Desktop",
-        [switch]$NoDump
+        [string]$OutputDir = "$env:USERPROFILE\Desktop"
     )
 
     $TimeStamp = Get-Date -Format "yyyyMMdd_HHmmss"
@@ -1478,10 +1477,9 @@ function Collect-LogsInCab {
         }
     }
 
-    Write-Host "`nGathering System & Environment Info..." -ForegroundColor Cyan
-    # Filter sensitive env vars
+    Write-Host "`n[1/5] Gathering System & Environment Info..." -ForegroundColor Cyan
     $envVars = Get-ChildItem Env: | Where-Object { $_.Name -notmatch 'PASSWORD|TOKEN|SECRET|KEY|CREDENTIAL|AUTH|API' }
-    $envVars | ForEach-Object { "$($_.Name)=$($_.Value)" } | Out-File "$WorkDir\env.txt"
+    $envVars | ForEach-Object { "$($_.Name)=$($_.Value)" } | Out-File "$WorkDir\env.txt" -Encoding ASCII
     
     & tasklist.exe > "$WorkDir\tasklist.txt"
     & systeminfo.exe > "$WorkDir\systeminfo.txt"
@@ -1490,7 +1488,7 @@ function Collect-LogsInCab {
     & sc.exe query "OneDrive Updater Service" > "$WorkDir\updaterservice.txt" 2>&1
     & sc.exe qc "OneDrive Updater Service" >> "$WorkDir\updaterservice.txt" 2>&1
 
-    Write-Host "Copying OneDrive Logs & Settings..." -ForegroundColor Cyan
+    Write-Host "[2/5] Copying OneDrive Logs & Settings..." -ForegroundColor Cyan
     $Paths = @(
         @{Src="$env:LOCALAPPDATA\Microsoft\OneDrive"; Dest="OneDrive"},
         @{Src="$env:PROGRAMDATA\Microsoft OneDrive"; Dest="LegacyMachineSetupLogs"},
@@ -1503,38 +1501,35 @@ function Collect-LogsInCab {
             $targetDir = Join-Path $ODWorkDir $p.Dest
             New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
             
-            # Tree output
-            Get-ChildItem $p.Src -Recurse -ErrorAction SilentlyContinue | Out-File "$targetDir\tree.txt"
+            Get-ChildItem $p.Src -Recurse -ErrorAction SilentlyContinue | Out-File "$targetDir\tree.txt" -Encoding ASCII
 
-            # Robocopy logs/settings with exclusions
             $logSrc = Join-Path $p.Src "logs"
             $setSrc = Join-Path $p.Src "settings"
             $setupSrc = Join-Path $p.Src "setup\logs"
 
             if (Test-Path $logSrc) { 
-                $robocopyArgs = @($logSrc, "$targetDir\logs", "/S") + $SyncLogsExclude
+                $robocopyArgs = @($logSrc, "$targetDir\logs", "/S", "/R:1", "/W:1") + $SyncLogsExclude
                 & robocopy.exe @robocopyArgs | Out-Null 
             }
             if (Test-Path $setSrc) { 
-                $robocopyArgs = @($setSrc, "$targetDir\settings", "/S") + $SyncSettingsExclude
+                $robocopyArgs = @($setSrc, "$targetDir\settings", "/S", "/R:1", "/W:1") + $SyncSettingsExclude
                 & robocopy.exe @robocopyArgs | Out-Null 
             }
-            if (Test-Path $setupSrc) { & robocopy.exe $setupSrc "$targetDir\setup\logs" /S | Out-Null }
+            if (Test-Path $setupSrc) { & robocopy.exe $setupSrc "$targetDir\setup\logs" /S /R:1 /W:1 | Out-Null }
         }
     }
 
-    Write-Host "Exporting Registry Keys (Deep Dive)..." -ForegroundColor Cyan
+    Write-Host "[3/5] Exporting Registry Keys (Deep Dive)..." -ForegroundColor Cyan
     $RegBaseHives = @("HKCU\Software", "HKLM\Software", "HKLM\Software\WOW6432Node")
     
     function Export-Reg {
         param([string]$Hive, [string]$Sub, [string]$Params, [string]$File)
         $full = "`"$Hive$Sub`""
         $out = & reg.exe query $full $Params 2>&1
-        if ($LASTEXITCODE -eq 0) { Add-Content -Path $File -Value $out } 
-        else { Add-Content -Path $File -Value "`"$Hive$Sub`" NOT FOUND" }
+        if ($LASTEXITCODE -eq 0) { Add-Content -Path $File -Value $out -Encoding ASCII } 
+        else { Add-Content -Path $File -Value "`"$Hive$Sub`" NOT FOUND" -Encoding ASCII }
     }
 
-    # Standard Keys
     Export-Reg "HKLM\Software" "\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers" "/s" "$ODWorkDir\reg_OverlayHandlers.txt"
     Export-Reg "HKCU\Software" "\Microsoft\Windows\CurrentVersion\Run" "/s" "$ODWorkDir\reg_RunKeys.txt"
     Export-Reg "HKCU\Software" "\Microsoft\OneDrive" "/s" "$ODWorkDir\reg_OneDriveRegKeys.txt"
@@ -1542,7 +1537,6 @@ function Collect-LogsInCab {
     Export-Reg "HKLM\Software" "\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager" "/s" "$ODWorkDir\reg_SyncRootManagerRegKeys.txt"
     Export-Reg "HKLM\Software" "\Policies\Microsoft\OneDrive" "/s" "$ODWorkDir\reg_OneDrivePolicies.txt"
 
-    # Massive COM / Interface Keys Array (Extracted from MS BAT)
     $COM_Paths = @(
         "\Classes\AppID{EEABD3A3-784D-4334-AAFC-BB13234F17CF}", "\Classes\AppID\OneDrive.EXE",
         "\Classes\CLSID{6bb93b4e-44d8-40e2-bd97-42dbcf18a40f}", "\Classes\SyncEngineCOMServer.SyncEngineCOMServer.1",
@@ -1602,52 +1596,66 @@ function Collect-LogsInCab {
         }
     }
 
-    Write-Host "Exporting Windows Event Logs..." -ForegroundColor Cyan
+    Write-Host "[4/5] Exporting Windows Event Logs & Tasks..." -ForegroundColor Cyan
     $EventLogs = @("Application", "System", "Setup", "Microsoft-Windows-Bits-Client/Operational", "Microsoft-Windows-TaskScheduler/Operational")
     foreach ($log in $EventLogs) {
         $safeName = $log -replace '/', '_'
         & wevtutil.exe export-log $log "$WorkDir\$safeName.evtx" 2>&1 | Out-Null
     }
 
-    Write-Host "Exporting Scheduled Tasks..." -ForegroundColor Cyan
     $Tasks = @("OneDrive Standalone Update Task", "OneDrive Standalone Update Task v2", "OneDrive Per-Machine Standalone Update Task")
     foreach ($t in $Tasks) {
         $safeT = $t -replace ' ', '_'
         & schtasks.exe /query /TN $t /XML > "$WorkDir\$safeT.xml" 2>&1
     }
 
-    Write-Host "Generating .CAB Archive (This may take a minute)..." -ForegroundColor Cyan
+    # --- CRITICAL FIX: Stop OneDrive to prevent file locks during CAB creation ---
+    Write-Host "`nStopping OneDrive to prevent file locks..." -ForegroundColor Yellow
+    Get-Process OneDrive -ErrorAction SilentlyContinue | Stop-Process -Force
+    Start-Sleep -Seconds 2
+
+    Write-Host "[5/5] Generating .CAB Archive (This may take a minute)..." -ForegroundColor Cyan
     $DdfFile = Join-Path $env:TEMP "Schema_$TimeStamp.ddf"
     
-    # Recursive DDF Generator
+    # Recursive DDF Generator (Fixed to use relative paths like the batch script)
     function Write-DDF {
         param([string]$TargetDir, [string]$Ddf, [string]$RelPath = ".")
-        Add-Content -Path $Ddf -Value ".set DestinationDir=$RelPath"
-        Get-ChildItem -Path $TargetDir -File -ErrorAction SilentlyContinue | ForEach-Object {
-            Add-Content -Path $Ddf -Value """$($_.FullName)"""
+        
+        Add-Content -Path $Ddf -Value ".set DestinationDir=$RelPath" -Encoding ASCII
+        
+        $files = Get-ChildItem -Path $TargetDir -File -ErrorAction SilentlyContinue
+        foreach ($file in $files) {
+            $relFilePath = Join-Path $RelPath $file.Name
+            Add-Content -Path $Ddf -Value """$relFilePath""" -Encoding ASCII
         }
-        Get-ChildItem -Path $TargetDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
-            $nextRel = if ($RelPath -eq ".") { $_.Name } else { "$RelPath\$($_.Name)" }
-            Write-DDF -TargetDir $_.FullName -Ddf $Ddf -RelPath $nextRel
+        
+        $dirs = Get-ChildItem -Path $TargetDir -Directory -ErrorAction SilentlyContinue
+        foreach ($dir in $dirs) {
+            $nextRel = if ($RelPath -eq ".") { ".\$($dir.Name)" } else { "$RelPath\$($dir.Name)" }
+            Write-DDF -TargetDir $dir.FullName -Ddf $Ddf -RelPath $nextRel
         }
     }
 
-    # DDF Header
-    @"
+    # DDF Header (Forced strict ASCII to prevent BOM issues)
+    $ddfHeader = @"
 .set CabinetNameTemplate=$CabName
 .set DiskDirectoryTemplate=
 .set InfFileName=$env:TEMP\temp.inf
 .set RptFileName=$env:TEMP\temp.rpt
 .set MaxDiskSize=0
 .set CompressionType=LZX
-"@ | Out-File $DdfFile -Encoding ASCII
+"@
+    [System.IO.File]::WriteAllText($DdfFile, $ddfHeader, [System.Text.Encoding]::ASCII)
 
     Write-DDF -TargetDir $WorkDir -Ddf $DdfFile
-    & makecab.exe /f $DdfFile | Out-Null
+    
+    # Run makecab and CAPTURE output so we can see if it fails
+    $cabOutput = & makecab.exe /f $DdfFile 2>&1
+    $cabExitCode = $LASTEXITCODE
 
     # Cleanup & Move
     $CabPath = Join-Path $env:TEMP $CabName
-    if (Test-Path $CabPath) {
+    if ((Test-Path $CabPath) -and $cabExitCode -eq 0) {
         Move-Item -Path $CabPath -Destination $OutputDir -Force
         Remove-Item -Path $WorkDir -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -Path $DdfFile -Force -ErrorAction SilentlyContinue
@@ -1658,9 +1666,23 @@ function Collect-LogsInCab {
         Write-Host "Upload this file to Microsoft Support or your IT Admin." -ForegroundColor Gray
     } else {
         Write-Host "`n❌ CAB generation failed." -ForegroundColor Red
+        Write-Host "makecab.exe output:" -ForegroundColor Yellow
+        $cabOutput | ForEach-Object { Write-Host $_ -ForegroundColor Gray }
+        Write-Host "Exit Code: $cabExitCode" -ForegroundColor Red
+        
+        # Fallback: Try standard ZIP if CAB fails
+        Write-Host "`nAttempting to create a standard .ZIP file as a fallback..." -ForegroundColor Cyan
+        $ZipPath = Join-Path $env:TEMP "OneDriveLogs_$TimeStamp.zip"
+        Compress-Archive -Path "$WorkDir\*" -DestinationPath $ZipPath -Force
+        if (Test-Path $ZipPath) {
+            Move-Item -Path $ZipPath -Destination $OutputDir -Force
+            Write-Host "✅ Fallback ZIP created: $OutputDir\OneDriveLogs_$TimeStamp.zip" -ForegroundColor Green
+        }
+        
+        Remove-Item -Path $WorkDir -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -Path $DdfFile -Force -ErrorAction SilentlyContinue
     }
 }
-
 
 
 # ===== Menu =====
