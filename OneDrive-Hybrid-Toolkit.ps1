@@ -1424,265 +1424,72 @@ function JunctionRemover {
 
 ===== Logs Collection (Deep Dive .CAB) =====
 function Collect-LogsInCab {
-    param (
-        [string]$OutputDir = "$env:USERPROFILE\Desktop"
+
+	Write-Host "`nLocating Microsoft's CollectSyncLogs.bat..." -ForegroundColor Cyan
+    
+    $searchPaths = @(
+        "$env:LOCALAPPDATA\Microsoft\OneDrive",
+        "${env:ProgramFiles(x86)}\Microsoft OneDrive",
+        "$env:ProgramFiles\Microsoft OneDrive"
     )
-
-    $TimeStamp = Get-Date -Format "yyyyMMdd_HHmmss"
-    $WorkDir = Join-Path $env:TEMP "LogCollection_$TimeStamp"
-    $CabName = "OneDriveLogs_$TimeStamp.cab"
     
-    New-Item -Path $WorkDir -ItemType Directory -Force | Out-Null
-    $ODWorkDir = Join-Path $WorkDir "OneDrive"
-    New-Item -Path $ODWorkDir -ItemType Directory -Force | Out-Null
-
-    Write-Host "`n=========================================" -ForegroundColor Cyan
-    Write-Host " OneDrive Deep-Dive Log Collection (.cab)" -ForegroundColor Cyan
-    Write-Host "=========================================" -ForegroundColor Cyan
-    Write-Host "Microsoft values your privacy." -ForegroundColor Yellow
-    Write-Host "Logs are scrambled by default. Giving support the Decoder Key allows them to unscramble file paths/emails." -ForegroundColor Gray
-
-    # --- Privacy Prompts ---
-    $DecoderKey = Read-Host "`nMay support unscramble your logs? (YES/NO)"
-    $SyncLogsExclude = @()
-    $SyncSettingsExclude = @()
+    $batFile = $null
     
-    if ($DecoderKey -match '^Y') {
-        Write-Host "`nWARNING: You are about to include ENCRYPTION KEYS." -ForegroundColor Red
-        $confirm = Read-Host "Type CONFIRM to proceed"
-        if ($confirm -ne 'CONFIRM') {
-            Write-Host "Cancelled. Continuing without decoder key." -ForegroundColor Yellow
-            $DecoderKey = 'N'
-            $SyncLogsExclude = @("ObfuscationStringMap.txt", "*.keystore")
-            $SyncSettingsExclude = @("*.dat")
-        }
-    } else {
-        $SyncLogsExclude = @("ObfuscationStringMap.txt", "*.keystore")
-        $SyncSettingsExclude = @("*.dat")
-    }
-
-    # --- Vault Key Prompt ---
-    if ($DecoderKey -match '^Y') {
-        $vaultReg = "HKCU:\Software\Microsoft\OneDrive\Accounts\Personal"
-        if (Test-Path $vaultReg) {
-            $vaultVal = Get-ItemProperty -Path $vaultReg -Name "VaultIntroShown" -ErrorAction SilentlyContinue
-            if ($vaultVal.VaultIntroShown -eq 1) {
-                $vaultKey = Read-Host "`nMay support unscramble your Personal Vault logs? (YES/NO)"
-                if ($vaultKey -match '^Y') {
-                    $odExe = "$env:LOCALAPPDATA\Microsoft\OneDrive\OneDrive.exe"
-                    if (Test-Path $odExe) { Start-Process $odExe -ArgumentList "/resetkeys /outputkeystorevault" }
-                    Read-Host "Unlock your Vault, then press ENTER to continue..."
+    # 1. Search for the .bat file in the latest version folders
+    foreach ($basePath in $searchPaths) {
+        if (Test-Path $basePath) {
+            # Get version folders (e.g., 24.111.0609.0001) and sort descending to get the latest
+            $versionFolders = Get-ChildItem -Path $basePath -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending
+            foreach ($folder in $versionFolders) {
+                $potentialBat = Join-Path $folder.FullName "CollectSyncLogs.bat"
+                if (Test-Path $potentialBat) {
+                    $batFile = $potentialBat
+                    break
+                }
+            }
+            
+            # 2. Fallback: Check root and Update folders if not in a version folder
+            if (-not $batFile) {
+                $fallbackPaths = @(
+                    (Join-Path $basePath "CollectSyncLogs.bat"),
+                    (Join-Path $basePath "Update\CollectSyncLogs.bat")
+                )
+                foreach ($fb in $fallbackPaths) {
+                    if (Test-Path $fb) {
+                        $batFile = $fb
+                        break
+                    }
                 }
             }
         }
+        if ($batFile) { break }
     }
-
-    Write-Host "`n[1/5] Gathering System & Environment Info..." -ForegroundColor Cyan
-    $envVars = Get-ChildItem Env: | Where-Object { $_.Name -notmatch 'PASSWORD|TOKEN|SECRET|KEY|CREDENTIAL|AUTH|API' }
-    $envVars | ForEach-Object { "$($_.Name)=$($_.Value)" } | Out-File "$WorkDir\env.txt" -Encoding ASCII
     
-    & tasklist.exe > "$WorkDir\tasklist.txt"
-    & systeminfo.exe > "$WorkDir\systeminfo.txt"
-    & net.exe start > "$WorkDir\services.txt"
-    & fltmc.exe > "$WorkDir\fltmc.txt" 2>&1
-    & sc.exe query "OneDrive Updater Service" > "$WorkDir\updaterservice.txt" 2>&1
-    & sc.exe qc "OneDrive Updater Service" >> "$WorkDir\updaterservice.txt" 2>&1
-
-    Write-Host "[2/5] Copying OneDrive Logs & Settings..." -ForegroundColor Cyan
-    $Paths = @(
-        @{Src="$env:LOCALAPPDATA\Microsoft\OneDrive"; Dest="OneDrive"},
-        @{Src="$env:PROGRAMDATA\Microsoft OneDrive"; Dest="LegacyMachineSetupLogs"},
-        @{Src="${env:PROGRAMFILES(X86)}\Microsoft OneDrive"; Dest="MachineSetupLogs"},
-        @{Src="$env:ProgramW6432\Microsoft OneDrive"; Dest="MachineAmd64SetupLogs"}
-    )
-
-    foreach ($p in $Paths) {
-        if (Test-Path $p.Src) {
-            $targetDir = Join-Path $ODWorkDir $p.Dest
-            New-Item -Path $targetDir -ItemType Directory -Force | Out-Null
-            
-            Get-ChildItem $p.Src -Recurse -ErrorAction SilentlyContinue | Out-File "$targetDir\tree.txt" -Encoding ASCII
-
-            $logSrc = Join-Path $p.Src "logs"
-            $setSrc = Join-Path $p.Src "settings"
-            $setupSrc = Join-Path $p.Src "setup\logs"
-
-            if (Test-Path $logSrc) { 
-                $robocopyArgs = @($logSrc, "$targetDir\logs", "/S", "/R:1", "/W:1") + $SyncLogsExclude
-                & robocopy.exe @robocopyArgs | Out-Null 
-            }
-            if (Test-Path $setSrc) { 
-                $robocopyArgs = @($setSrc, "$targetDir\settings", "/S", "/R:1", "/W:1") + $SyncSettingsExclude
-                & robocopy.exe @robocopyArgs | Out-Null 
-            }
-            if (Test-Path $setupSrc) { & robocopy.exe $setupSrc "$targetDir\setup\logs" /S /R:1 /W:1 | Out-Null }
-        }
+    # 3. Handle if the file is missing
+    if (-not $batFile) {
+        Write-Host "ERROR: Could not find CollectSyncLogs.bat in any OneDrive installation path." -ForegroundColor Red
+        Write-Host "Please ensure OneDrive is installed, or download the official MS log collection tool." -ForegroundColor Yellow
+        return
     }
-
-    Write-Host "[3/5] Exporting Registry Keys (Deep Dive)..." -ForegroundColor Cyan
-    $RegBaseHives = @("HKCU\Software", "HKLM\Software", "HKLM\Software\WOW6432Node")
     
-    function Export-Reg {
-        param([string]$Hive, [string]$Sub, [string]$Params, [string]$File)
-        $full = "`"$Hive$Sub`""
-        $out = & reg.exe query $full $Params 2>&1
-        if ($LASTEXITCODE -eq 0) { Add-Content -Path $File -Value $out -Encoding ASCII } 
-        else { Add-Content -Path $File -Value "`"$Hive$Sub`" NOT FOUND" -Encoding ASCII }
-    }
-
-    Export-Reg "HKLM\Software" "\Microsoft\Windows\CurrentVersion\Explorer\ShellIconOverlayIdentifiers" "/s" "$ODWorkDir\reg_OverlayHandlers.txt"
-    Export-Reg "HKCU\Software" "\Microsoft\Windows\CurrentVersion\Run" "/s" "$ODWorkDir\reg_RunKeys.txt"
-    Export-Reg "HKCU\Software" "\Microsoft\OneDrive" "/s" "$ODWorkDir\reg_OneDriveRegKeys.txt"
-    Export-Reg "HKCU\Software" "\SyncEngines\Providers\OneDrive" "/s" "$ODWorkDir\reg_SyncEngineProviders.txt"
-    Export-Reg "HKLM\Software" "\Microsoft\Windows\CurrentVersion\Explorer\SyncRootManager" "/s" "$ODWorkDir\reg_SyncRootManagerRegKeys.txt"
-    Export-Reg "HKLM\Software" "\Policies\Microsoft\OneDrive" "/s" "$ODWorkDir\reg_OneDrivePolicies.txt"
-
-    $COM_Paths = @(
-        "\Classes\AppID{EEABD3A3-784D-4334-AAFC-BB13234F17CF}", "\Classes\AppID\OneDrive.EXE",
-        "\Classes\CLSID{6bb93b4e-44d8-40e2-bd97-42dbcf18a40f}", "\Classes\SyncEngineCOMServer.SyncEngineCOMServer.1",
-        "\Classes\SyncEngineCOMServer.SyncEngineCOMServer", "\Classes\CLSID{AB807329-7324-431B-8B36-DBD581F56E0B}",
-        "\Classes\SyncEngineStorageProviderHandlerProxy.SyncEngineStorageProviderHandlerProxy.1", "\Classes\SyncEngineStorageProviderHandlerProxy.SyncEngineStorageProviderHandlerProxy",
-        "\Classes\CLSID{A3CA1CF4-5F3E-4AC0-91B9-0D3716E1EAC3}", "\Classes\TypeLib{638805C3-4BA3-4AC8-8AAC-71A0BA2BC284}\1.0",
-        "\Classes\TypeLib{082D3FEC-D0D0-4DF6-A988-053FECE7B884}\1.0", "\Classes\FileSyncClient.FileSyncClient.1",
-        "\Classes\FileSyncClient.FileSyncClient", "\Classes\CLSID{7B37E4E2-C62F-4914-9620-8FB5062718CC}",
-        "\Classes\FileSyncClient.AutoPlayHandler.1", "\Classes\FileSyncClient.AutoPlayHandler",
-        "\Classes\CLSID{5999E1EE-711E-48D2-9884-851A709F543D}", "\Classes\BannerNotificationHandler.BannerNotificationHandler.1",
-        "\Classes\BannerNotificationHandler.BannerNotificationHandler", "\Classes\CLSID{2e7c0a19-0438-41e9-81e3-3ad3d64f55ba}",
-        "\Classes\Interface{F0AF7C30-EAE4-4644-961D-54E6E28708D6}", "\Classes\Interface{9D613F8A-B30E-4938-8490-CB5677701EBF}",
-        "\Classes\Interface{79A2A54C-3916-41FD-9FAB-F26ED0BBA755}", "\Classes\Interface{0299ECA9-80B6-43C8-A79A-FB1C5F19E7D8}",
-        "\Classes\Interface{0f872661-c863-47a4-863f-c065c182858a}", "\Classes\Interface{da82e55e-fa2f-45b3-aec3-e7294106ef52}",
-        "\Classes\Interface{e9de26a1-51b2-47b4-b1bf-c87059cc02a7}", "\Classes\Interface{2692D1F2-2C7C-4AE0-8E73-8F37736C912D}",
-        "\Classes\Interface{5D5DD08F-A10E-4FEF-BCA7-E73E666FC66C}", "\Classes\Interface{EE15BBBB-9E60-4C52-ABCB-7540FF3DF6B3}",
-        "\Classes\Interface{8D3F8F15-1DE1-4662-BF93-762EABE988B2}", "\Classes\Interface{2B865677-AC3A-43BD-B9E7-BF6FCD3F0596}",
-        "\Classes\Interface{ACDB5DB0-C9D5-461C-BAAA-5DCE0B980E40}", "\Classes\Interface{909A6CCD-6810-46C4-89DF-05BE7EB61E6C}",
-        "\Classes\Interface{10C9242E-D604-49B5-99E4-BF87945EF86C}", "\Classes\Interface{F062BA81-ADFE-4A92-886A-23FD851D6406}",
-        "\Classes\Interface{3A4E62AE-45D9-41D5-85F5-A45B77AB44E5}", "\Classes\Interface{390AF5A7-1390-4255-9BC9-935BFCFA5D57}",
-        "\Classes\Interface{1196AE48-D92B-4BC7-85DE-664EC3F761F1}", "\Classes\Interface{D0ED5C72-6197-4AAD-9B16-53FE461DD85C}",
-        "\Classes\Interface{AF60000F-661D-472A-9588-F062F6DB7A0E}", "\Classes\Interface{b5c25645-7426-433f-8a5f-42b7ff27a7b2}",
-        "\Classes\Interface{1b7aed4f-fcaf-4da4-8795-c03e635d8edc}", "\Classes\Interface{0d4e4444-cb20-4c2b-b8b2-94e5656ecae8}",
-        "\Classes\Interface{d8c80ebb-099c-4208-afa3-fbc4d11f8a3c}", "\Classes\Interface{C2FE84F5-E036-4A07-950C-9BFD3EAB983A}",
-        "\Classes\Interface{a7126d4c-f492-4eb9-8a2a-f673dbdd3334}", "\Classes\Interface{c1439245-96b4-47fc-b391-679386c5d40f}",
-        "\Classes\Interface{02C98E2C-6C9F-49F8-9B57-3A6E1AA09A67}", "\Classes\Interface{385ED83D-B50C-4580-B2C3-9E64DBE7F511}",
-        "\Classes\Interface{8B9F14F4-9559-4A3F-B7D0-312E992B6D98}", "\Classes\Interface{22A68885-0FD9-42F6-9DED-4FB174DC7344}",
-        "\Classes\Interface{9E1CD0DF-72E7-4284-9598-342C0A46F96B}", "\Classes\Interface{944903E8-B03F-43A0-8341-872200D2DA9C}",
-        "\Classes\Interface{B54E7079-90C9-4C62-A6B8-B2834C33A04A}", "\Classes\Interface{1B71F23B-E61F-45C9-83BA-235D55F50CF9}",
-        "\Classes\Interface{EA23A664-A558-4548-A8FE-A6B94D37C3CF}", "\Classes\Interface{2F12C599-7AA5-407A-B898-09E6E4ED2D1E}",
-        "\Classes\Interface{2EB31403-EBE0-41EA-AE91-A1953104EA55}", "\Classes\Interface{AEEBAD4E-3E0A-415B-9B94-19C499CD7B6A}",
-        "\Classes\Interface{fac14b75-7862-4ceb-be41-f53945a61c17}", "\Classes\TypeLib{BAE13F6C-0E2A-4DEB-AA46-B8F55319347C}\1.0",
-        "\Classes\CLSID{BBACC218-34EA-4666-9D7A-C78F2274A524}", "\Classes\CLSID{5AB7172C-9C11-405C-8DD5-AF20F3606282}",
-        "\Classes\CLSID{A78ED123-AB77-406B-9962-2A5D9D2F7F30}", "\Classes\CLSID{A0396A93-DC06-4AEF-BEE9-95FFCCAEF20E}",
-        "\Classes\CLSID{F241C880-6982-4CE5-8CF7-7085BA96DA5A}", "\Classes\CLSID{9AA2F32D-362A-42D9-9328-24A483E2CCC3}",
-        "\Classes\CLSID{C5FF006E-2AE9-408C-B85B-2DFDD5449D9C}", "\Classes\CLSID{7AFDFDDB-F914-11E4-8377-6C3BE50D980C}",
-        "\Classes\CLSID{82CA8DE3-01AD-4CEA-9D75-BE4C51810A9E}", "\Classes\CLSID{1BF42E4C-4AF4-4CFD-A1A0-CF2960B8F63E}",
-        "\Classes\CLSID{CB3D0F55-BC2C-4C1A-85ED-23ED75B5106B}", "\Classes\*\shellex\ContextMenuHandlers\FileSyncEx",
-        "\Classes\Directory\Background\shellex\ContextMenuHandlers\FileSyncEx", "\Classes\Directory\shellex\ContextMenuHandlers\FileSyncEx",
-        "\Classes\CLSID{021E4F06-9DCC-49AD-88CF-ECC2DA314C8A}", "\Classes\Interface{31508CC7-9BC7-494B-9D0F-7B1C7F144182}",
-        "\Classes\TypeLib{C9F3F6BB-3172-4CD8-9EB7-37C9BE601C87}\1.0", "\Classes\OOBERequestHandler.OOBERequestHandler.1",
-        "\Classes\OOBERequestHandler.OOBERequestHandler", "\Classes\CLSID{94269C4E-071A-4116-90E6-52E557067E4E}",
-        "\Classes\SyncEngineFileInfoProvider.SyncEngineFileInfoProvider.1", "\Classes\SyncEngineFileInfoProvider.SyncEngineFileInfoProvider",
-        "\Classes\CLSID{71DCE5D6-4B57-496B-AC21-CD5B54EB93FD}", "\Classes\Interface{466F31F7-9892-477E-B189-FA5C59DE3603}",
-        "\Classes\Interface{869BDA08-7ACF-42B8-91AE-4D8D597C0B33}", "\Classes\Interface{679EC955-75AA-4FB2-A7ED-8C0152ECF409}",
-        "\Classes\CLSID{389510b7-9e58-40d7-98bf-60b911cb0ea9}", "\Classes\CLSID{9489FEB2-1925-4D01-B788-6D912C70F7F2}",
-        "\Classes\CLSID{4410DC33-BC7C-496B-AA84-4AEA3EEE75F7}", "\Classes\Interface{B05D37A9-03A2-45CF-8850-F660DF0CBF07}",
-        "\Classes\Interface{6A821279-AB49-48F8-9A27-F6C59B4FF024}", "\Classes\Interface{4410DC33-BC7C-496B-AA84-4AEA3EEE75F7}",
-        "\Classes\CLSID{A926714B-7BFC-4D08-A035-80021395FFA8}", "\Classes\Interface{162C6FB5-44D3-435B-903D-E613FA093FB5}",
-        "\Classes\Interface{301DFBE5-524C-4B0F-8B2D-21C40B3A2988}"
-    )
-
-    $comFile = "$ODWorkDir\reg_COM.txt"
-    foreach ($hive in $RegBaseHives) {
-        foreach ($sub in $COM_Paths) {
-            Export-Reg $hive $sub "/s" $comFile
-        }
-    }
-
-    Write-Host "[4/5] Exporting Windows Event Logs & Tasks..." -ForegroundColor Cyan
-    $EventLogs = @("Application", "System", "Setup", "Microsoft-Windows-Bits-Client/Operational", "Microsoft-Windows-TaskScheduler/Operational")
-    foreach ($log in $EventLogs) {
-        $safeName = $log -replace '/', '_'
-        & wevtutil.exe export-log $log "$WorkDir\$safeName.evtx" 2>&1 | Out-Null
-    }
-
-    $Tasks = @("OneDrive Standalone Update Task", "OneDrive Standalone Update Task v2", "OneDrive Per-Machine Standalone Update Task")
-    foreach ($t in $Tasks) {
-        $safeT = $t -replace ' ', '_'
-        & schtasks.exe /query /TN $t /XML > "$WorkDir\$safeT.xml" 2>&1
-    }
-
-    # --- CRITICAL FIX: Stop OneDrive to prevent file locks during CAB creation ---
-    Write-Host "`nStopping OneDrive to prevent file locks..." -ForegroundColor Yellow
-    Get-Process OneDrive -ErrorAction SilentlyContinue | Stop-Process -Force
-    Start-Sleep -Seconds 2
-
-    Write-Host "[5/5] Generating .CAB Archive (This may take a minute)..." -ForegroundColor Cyan
-    $DdfFile = Join-Path $env:TEMP "Schema_$TimeStamp.ddf"
+    Write-Host "✅ Found log collector: $batFile" -ForegroundColor Green
+    Write-Host "`nInstructions:" -ForegroundColor Cyan
+    Write-Host "- A new Command Prompt window will open." -ForegroundColor Gray
+    Write-Host "- Select NO if file/folder names contain sensitive data." -ForegroundColor Gray
+    Write-Host "- Select YES to include readable names (recommended for deeper analysis)." -ForegroundColor Gray
+    Write-Host "- Once finished, the .cab file will be saved to your Desktop." -ForegroundColor Gray
+    Write-Host "`nPress any key to launch the collector..." -ForegroundColor Yellow
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
     
-    # Recursive DDF Generator (Fixed to use relative paths like the batch script)
-    function Write-DDF {
-        param([string]$TargetDir, [string]$Ddf, [string]$RelPath = ".")
-        
-        Add-Content -Path $Ddf -Value ".set DestinationDir=$RelPath" -Encoding ASCII
-        
-        $files = Get-ChildItem -Path $TargetDir -File -ErrorAction SilentlyContinue
-        foreach ($file in $files) {
-            $relFilePath = Join-Path $RelPath $file.Name
-            Add-Content -Path $Ddf -Value """$relFilePath""" -Encoding ASCII
-        }
-        
-        $dirs = Get-ChildItem -Path $TargetDir -Directory -ErrorAction SilentlyContinue
-        foreach ($dir in $dirs) {
-            $nextRel = if ($RelPath -eq ".") { ".\$($dir.Name)" } else { "$RelPath\$($dir.Name)" }
-            Write-DDF -TargetDir $dir.FullName -Ddf $Ddf -RelPath $nextRel
-        }
-    }
-
-    # DDF Header (Forced strict ASCII to prevent BOM issues)
-    $ddfHeader = @"
-.set CabinetNameTemplate=$CabName
-.set DiskDirectoryTemplate=
-.set InfFileName=$env:TEMP\temp.inf
-.set RptFileName=$env:TEMP\temp.rpt
-.set MaxDiskSize=0
-.set CompressionType=LZX
-"@
-    [System.IO.File]::WriteAllText($DdfFile, $ddfHeader, [System.Text.Encoding]::ASCII)
-
-    Write-DDF -TargetDir $WorkDir -Ddf $DdfFile
+    # 4. Launch the .bat file
+    # We use Start-Process with -Wait so it opens in its own clean window, 
+    # and the PowerShell script pauses until the user closes the CMD window.
+    Start-Process cmd.exe -ArgumentList "/k `"$batFile`"" -Wait
     
-    # Run makecab and CAPTURE output so we can see if it fails
-    $cabOutput = & makecab.exe /f $DdfFile 2>&1
-    $cabExitCode = $LASTEXITCODE
+    Write-Host "`n✅ Log collection process finished." -ForegroundColor Green
+    Write-Host "Please check your Desktop for the OneDriveLogs_*.cab file." -ForegroundColor Cyan
 
-    # Cleanup & Move
-    $CabPath = Join-Path $env:TEMP $CabName
-    if ((Test-Path $CabPath) -and $cabExitCode -eq 0) {
-        Move-Item -Path $CabPath -Destination $OutputDir -Force
-        Remove-Item -Path $WorkDir -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path $DdfFile -Force -ErrorAction SilentlyContinue
-        
-        Write-Host "`n✅ SUCCESS!" -ForegroundColor Green
-        Write-Host "CAB File saved to: " -NoNewline
-        Write-Host "$OutputDir\$CabName" -ForegroundColor Yellow
-        Write-Host "Upload this file to Microsoft Support or your IT Admin." -ForegroundColor Gray
-    } else {
-        Write-Host "`n❌ CAB generation failed." -ForegroundColor Red
-        Write-Host "makecab.exe output:" -ForegroundColor Yellow
-        $cabOutput | ForEach-Object { Write-Host $_ -ForegroundColor Gray }
-        Write-Host "Exit Code: $cabExitCode" -ForegroundColor Red
-        
-        # Fallback: Try standard ZIP if CAB fails
-        Write-Host "`nAttempting to create a standard .ZIP file as a fallback..." -ForegroundColor Cyan
-        $ZipPath = Join-Path $env:TEMP "OneDriveLogs_$TimeStamp.zip"
-        Compress-Archive -Path "$WorkDir\*" -DestinationPath $ZipPath -Force
-        if (Test-Path $ZipPath) {
-            Move-Item -Path $ZipPath -Destination $OutputDir -Force
-            Write-Host "✅ Fallback ZIP created: $OutputDir\OneDriveLogs_$TimeStamp.zip" -ForegroundColor Green
-        }
-        
-        Remove-Item -Path $WorkDir -Recurse -Force -ErrorAction SilentlyContinue
-        Remove-Item -Path $DdfFile -Force -ErrorAction SilentlyContinue
     }
-}
 
 
 # ===== Menu =====
