@@ -93,7 +93,26 @@ Show current status
 | **1A** | Real-Time Folder Monitor | Watches your OneDrive folder and prints a message whenever a file is added or changed. |
 | **1B** | Restore Default Folders | Fixes your Desktop, Documents, Pictures, etc., if they disappeared after removing OneDrive. |
 | **1C** | Junction Remover | Safely moves your Desktop/Documents folders out of OneDrive and back to your local computer. |
+| **1D** | Windows diagnostic script designed to gather comprehensive logs, system information, and registry configurations related to the Microsoft OneDrive client.|
 | **0** | Exit | Closes the toolkit. |
+
+
+In Depth Working of 1D:
+
+**Features & Collected Data**
+When executed, the script securely collects the following information:
+System & Environment Data: Filtered environment variables (sensitive tokens/passwords are excluded), systeminfo, tasklist, running services, and filter drivers (fltmc).
+OneDrive Logs & Settings: Client logs, setup logs, and settings from both Per-User (%LOCALAPPDATA%) and Per-Machine (%PROGRAMFILES%, %PROGRAMDATA%) directories.
+Registry Keys: Extensive registry snapshots including Overlay Handlers, Run/RunOnce keys, OneDrive Policies, SyncRootManager, COM registrations, and Autoplay handlers.
+Windows Event Logs: Exports of Application, System, Setup, BITS, and TaskScheduler event logs (.evtx).
+Scheduled Tasks: XML exports of OneDrive Standalone Update Tasks.
+OS Specifics: Checks for Windows 11 Sparse Package configurations and elevation states.
+Directory Trees: Maps of the OneDrive installation directories.|
+**Privacy & Obfuscation (Decoder Key)**
+To protect user privacy, OneDrive automatically obfuscates (scrambles) sensitive information like URLs, email addresses, and file/folder names in its logs.
+During execution, the script will prompt you to allow Microsoft Support to "unscramble" these logs by including the Decoder Key (ObfuscationStringMap.txt).
+You will also be prompted if you use OneDrive Personal Vault and wish to include its specific encryption keys for troubleshooting.
+Note: If you decline, support engineers will still see the logs, but file paths and URLs will be unreadable, which may require you to perform additional manual steps to identify the affected files.
 
 
 # Windows Event Export Toolkit
