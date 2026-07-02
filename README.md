@@ -93,7 +93,7 @@ Show current status
 | **1A** | Real-Time Folder Monitor | Watches your OneDrive folder and prints a message whenever a file is added or changed. |
 | **1B** | Restore Default Folders | Fixes your Desktop, Documents, Pictures, etc., if they disappeared after removing OneDrive. |
 | **1C** | Junction Remover | Safely moves your Desktop/Documents folders out of OneDrive and back to your local computer. |
-| **1D** | Windows diagnostic script designed to gather comprehensive logs, system information, and registry configurations related to the Microsoft OneDrive client.|
+| **1D** | Collect Logs in .cab | Windows diagnostic script designed to gather comprehensive logs, system information, and registry configurations related to the Microsoft OneDrive client.|
 | **0** | Exit | Closes the toolkit. |
 
 
@@ -108,6 +108,9 @@ Windows Event Logs: Exports of Application, System, Setup, BITS, and TaskSchedul
 Scheduled Tasks: XML exports of OneDrive Standalone Update Tasks.
 OS Specifics: Checks for Windows 11 Sparse Package configurations and elevation states.
 Directory Trees: Maps of the OneDrive installation directories.|
+
+|
+
 **Privacy & Obfuscation (Decoder Key)**
 To protect user privacy, OneDrive automatically obfuscates (scrambles) sensitive information like URLs, email addresses, and file/folder names in its logs.
 During execution, the script will prompt you to allow Microsoft Support to "unscramble" these logs by including the Decoder Key (ObfuscationStringMap.txt).
