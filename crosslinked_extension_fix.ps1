@@ -1,14 +1,24 @@
 <#
 .SYNOPSIS
-    Fully silent TrID automation with real-time progress bar.
-    Prompts for target directory if run manually, accepts -TargetDir for automation.
+    Intelligent TrID automation with real-time progress bar and enhanced dual reporting.
+    Prompts for target directory if run manually, accepts parameters for automation.
+
+.DESCRIPTION
+    Smart improvements include:
+    - Safe handling of paths with spaces (fixes CSV export failures).
+    - True percentage-based progress bar (pre-counts files).
+    - Generates both a detailed CSV and a high-level HTML Summary Report.
+    - Supports -DryRun for safe testing without modifying files.
 #>
 [CmdletBinding()]
 param(
     [string]$TargetDir = "",
-    [string]$OutputCsv = "results.csv",
+    [string]$OutputCsv = "TrID_Results.csv",
+    [string]$SummaryReport = "TrID_Summary_Report.html",
     [switch]$Force,
-    [switch]$HideConsole
+    [switch]$HideConsole,
+    [switch]$DryRun,
+    [switch]$OpenReport
 )
 
 # ==================== GLOBAL SETUP ====================
@@ -26,9 +36,14 @@ if ($HideConsole -and $host.Name -eq 'ConsoleHost') {
 
 $ScriptDir = $PSScriptRoot
 $LogPath = Join-Path $ScriptDir "TrID_Python_$(Get-Date -Format 'yyyyMMdd_HHmmss').log"
+
 function Write-Log {
     param([Parameter(Mandatory)][string]$Message, [ValidateSet("INFO","WARN","ERROR","SUCCESS")][string]$Level = "INFO")
     "$((Get-Date -Format "yyyy-MM-dd HH:mm:ss")) [$Level] $Message" | Add-Content -Path $LogPath -Force
+    if (-not $HideConsole) {
+        $color = switch ($Level) { "ERROR" { "Red" } "WARN" { "Yellow" } "SUCCESS" { "Green" } default { "White" } }
+        Write-Host "[$Level] $Message" -ForegroundColor $color
+    }
 }
 
 Write-Log "=== TrID Python Automation Started ===" "INFO"
@@ -118,16 +133,40 @@ if ($Force -or -not (Test-Path $DefsPath)) {
     } catch { Write-Log "Defs download failed: $_" "ERROR"; exit 1 }
 } else { Write-Log "Definitions already present." "INFO" }
 
-# ==================== 4. EXECUTE TRID WITH PROGRESS BAR ====================
-$OutputPath = Join-Path $ScriptDir $OutputCsv
-Write-Log "Target: $TargetDir | Output: $OutputPath" "INFO"
+# ==================== 4. SMART PRE-COUNT FOR PROGRESS BAR ====================
+Write-Log "Counting files in target directory for smart progress tracking..." "INFO"
+if (-not $HideConsole) { Write-Progress -Activity "Preparing" -Status "Counting files (this may take a moment)..." }
+$totalFiles = (Get-ChildItem -Path $TargetDir -File -Recurse -ErrorAction SilentlyContinue).Count
+if (-not $HideConsole) { Write-Progress -Activity "Preparing" -Completed }
 
-$CmdArgs = @($TridPyPath, $TargetDir, "-ce", "-o", $OutputPath)
-Write-Log "Executing: $PythonExe $($CmdArgs -join ' ')" "INFO"
+if ($totalFiles -eq 0) {
+    Write-Log "No files found in target directory. Exiting." "WARN"
+    exit 0
+}
+Write-Log "Found $totalFiles files to process." "INFO"
+
+# ==================== 5. EXECUTE TRID WITH PROGRESS BAR ====================
+$OutputPath = Join-Path $ScriptDir $OutputCsv
+Write-Log "Target: $TargetDir | Output CSV: $OutputPath" "INFO"
+
+# SMART FIX: Properly quote arguments to prevent space-related failures
+$quotedArgs = @(
+    "`"$TridPyPath`"",
+    "`"$TargetDir`"",
+    "-o",
+    "`"$OutputPath`""
+)
+
+if (-not $DryRun) {
+    $quotedArgs.Insert(2, "-ce") # Insert -ce at index 2
+    Write-Log "Mode: LIVE (Extensions will be changed)" "INFO"
+} else {
+    Write-Log "Mode: DRY RUN (Extensions will NOT be changed, report only)" "WARN"
+}
 
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $PythonExe
-$psi.Arguments = $CmdArgs -join ' '
+$psi.Arguments = $quotedArgs -join " "
 $psi.WorkingDirectory = $ScriptDir
 $psi.WindowStyle = "Hidden"
 $psi.RedirectStandardOutput = $true
@@ -142,19 +181,22 @@ $stdoutLog = [System.Text.StringBuilder]::new()
 $stderrLog = [System.Text.StringBuilder]::new()
 $fileCount = 0
 
-# Real-time output reading + Progress Bar
+# Real-time output reading + Smart Progress Bar
 while (-not $proc.HasExited) {
     try {
         if ($outReader.Peek() -ge 0) {
             $line = $outReader.ReadLine()
             if ($line) {
                 $stdoutLog.AppendLine($line) | Out-Null
-                $fileCount++
-                # Update progress when trid.py outputs a file path
-                if (-not $HideConsole -and $line -match "File:\s+(.+)") {
-                    Write-Progress -Activity "TrID Extension Correction" `
-                                   -Status "Analyzing: $($Matches[1])" `
-                                   -CurrentOperation "Files processed: $fileCount"
+                if ($line -match "File:\s+(.+)") {
+                    $fileCount++
+                    $percentComplete = [math]::Round(($fileCount / $totalFiles) * 100, 2)
+                    if (-not $HideConsole) {
+                        Write-Progress -Activity "TrID Extension Correction" `
+                                       -Status "Analyzing: $($Matches[1])" `
+                                       -PercentComplete $percentComplete `
+                                       -CurrentOperation "Files processed: $fileCount of $totalFiles ($percentComplete%)"
+                    }
                 }
             }
         }
@@ -170,7 +212,6 @@ while (-not $proc.HasExited) {
 while (($line = $outReader.ReadLine()) -ne $null) { $stdoutLog.AppendLine($line) | Out-Null }
 while (($errLine = $errReader.ReadLine()) -ne $null) { $stderrLog.AppendLine($errLine) | Out-Null }
 
-# Complete progress bar
 if (-not $HideConsole) { Write-Progress -Activity "TrID Extension Correction" -Completed }
 
 $stdout = $stdoutLog.ToString().Trim()
@@ -179,13 +220,88 @@ $stderr = $stderrLog.ToString().Trim()
 if ($stdout) { Write-Log "Python Output: $stdout" "INFO" }
 if ($stderr) { Write-Log "Python Error: $stderr" "WARN" }
 
+# ==================== 6. GENERATE ENHANCED REPORTS ====================
 if ($proc.ExitCode -eq 0) {
-    Write-Log "SUCCESS: Extension correction complete. Results: $OutputPath" "SUCCESS"
+    Write-Log "SUCCESS: Analysis complete." "SUCCESS"
+    
+    # Generate HTML Summary Report
     if (Test-Path $OutputPath) {
         try {
-            $Rows = (Import-Csv $OutputPath -ErrorAction SilentlyContinue).Count
-            Write-Log "CSV contains $Rows processed files." "INFO"
-        } catch { Write-Log "Could not count CSV rows." "WARN" }
+            $data = Import-Csv -Path $OutputPath -ErrorAction Stop
+            $total = $data.Count
+            $unknown = ($data | Where-Object { $_.'TrID-Score' -eq "0" -or [string]::IsNullOrWhiteSpace($_.Filetype) }).Count
+            $processedLabel = if ($DryRun) { "Identified (No changes made)" } else { "Identified & Processed" }
+            $processedCount = $total - $unknown
+            
+            $topTypes = $data | Where-Object { $_.Filetype -ne "" } | Group-Object Filetype | Sort-Object Count -Descending | Select-Object -First 5
+            
+            $html = @"
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; color: #333; background: #fcfcfc; }
+        h1 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .summary-box { display: flex; gap: 20px; margin-bottom: 30px; flex-wrap: wrap; }
+        .card { background: #fff; padding: 25px; border-radius: 8px; flex: 1; min-width: 200px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-top: 4px solid #3498db; }
+        .card h2 { margin: 0; font-size: 2.5em; color: #2c3e50; }
+        .card p { margin: 10px 0 0; color: #7f8c8d; font-weight: 600; text-transform: uppercase; font-size: 0.9em; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; background: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #eee; }
+        th { background-color: #2c3e50; color: white; font-weight: 600; }
+        tr:hover { background-color: #f8f9fa; }
+        .footer { margin-top: 40px; color: #95a5a6; font-size: 0.9em; }
+    </style>
+</head>
+<body>
+    <h1>TrID Analysis Summary Report</h1>
+    <p><strong>Generated:</strong> $(Get-Date -Format "yyyy-MM-dd HH:mm:ss")<br>
+    <strong>Target Directory:</strong> $TargetDir<br>
+    <strong>Mode:</strong> $(if ($DryRun) { "Dry Run (Read-Only)" } else { "Live (Extensions Changed)" })</p>
+    
+    <div class="summary-box">
+        <div class="card">
+            <h2>$total</h2>
+            <p>Total Files Scanned</p>
+        </div>
+        <div class="card" style="border-top-color: #27ae60;">
+            <h2 style="color: #27ae60;">$processedCount</h2>
+            <p>$processedLabel</p>
+        </div>
+        <div class="card" style="border-top-color: #e74c3c;">
+            <h2 style="color: #e74c3c;">$unknown</h2>
+            <p>Unknown / Unmatched</p>
+        </div>
+    </div>
+
+    <h3>Top 5 Detected File Types</h3>
+    <table>
+        <tr><th>File Type</th><th>Count</th><th>Percentage</th></tr>
+"@
+            foreach ($type in $topTypes) {
+                $pct = [math]::Round(($type.Count / $total) * 100, 1)
+                $html += "        <tr><td>$($type.Name)</td><td>$($type.Count)</td><td>$pct%</td></tr>`n"
+            }
+            $html += @"
+    </table>
+    <div class="footer">
+        <p><em>Detailed row-by-row results are available in:</em><br><strong>$OutputPath</strong></p>
+    </div>
+</body>
+</html>
+"@
+            $htmlPath = Join-Path $ScriptDir $SummaryReport
+            $html | Out-File -FilePath $htmlPath -Encoding UTF8 -Force
+            Write-Log "Summary report generated: $htmlPath" "SUCCESS"
+            
+            if ($OpenReport) {
+                Write-Log "Opening summary report..." "INFO"
+                Invoke-Item -Path $htmlPath
+            }
+        } catch {
+            Write-Log "Failed to generate summary report: $_" "WARN"
+        }
     }
 } else {
     Write-Log "WARNING: Process exited with code $($proc.ExitCode)." "WARN"
