@@ -2,13 +2,6 @@
 .SYNOPSIS
     Intelligent TrID automation with real-time progress bar and enhanced dual reporting.
     Prompts for target directory if run manually, accepts parameters for automation.
-
-.DESCRIPTION
-    Smart improvements include:
-    - Safe handling of paths with spaces (fixes CSV export failures).
-    - True percentage-based progress bar (pre-counts files).
-    - Generates both a detailed CSV and a high-level HTML Summary Report.
-    - Supports -DryRun for safe testing without modifying files.
 #>
 [CmdletBinding()]
 param(
@@ -51,7 +44,7 @@ Write-Log "=== TrID Python Automation Started ===" "INFO"
 # ==================== 1. INTERACTIVE INPUT / VALIDATION ====================
 if ([string]::IsNullOrWhiteSpace($TargetDir)) {
     if ($HideConsole) {
-        Write-Log "ERROR: -TargetDir parameter is required when running silently or via Task Scheduler." "ERROR"
+        Write-Log "ERROR: -TargetDir parameter is required when running silently." "ERROR"
         exit 1
     }
     Write-Host "`n[TrID Auto] Please enter the target directory path:" -ForegroundColor Cyan
@@ -135,7 +128,7 @@ if ($Force -or -not (Test-Path $DefsPath)) {
 
 # ==================== 4. SMART PRE-COUNT FOR PROGRESS BAR ====================
 Write-Log "Counting files in target directory for smart progress tracking..." "INFO"
-if (-not $HideConsole) { Write-Progress -Activity "Preparing" -Status "Counting files (this may take a moment)..." }
+if (-not $HideConsole) { Write-Progress -Activity "Preparing" -Status "Counting files..." }
 $totalFiles = (Get-ChildItem -Path $TargetDir -File -Recurse -ErrorAction SilentlyContinue).Count
 if (-not $HideConsole) { Write-Progress -Activity "Preparing" -Completed }
 
@@ -149,24 +142,27 @@ Write-Log "Found $totalFiles files to process." "INFO"
 $OutputPath = Join-Path $ScriptDir $OutputCsv
 Write-Log "Target: $TargetDir | Output CSV: $OutputPath" "INFO"
 
-# SMART FIX: Properly quote arguments to prevent space-related failures
-$quotedArgs = @(
+# SMART FIX: Build arguments array dynamically using += to avoid fixed-size array errors
+$cmdArgs = @(
     "`"$TridPyPath`"",
-    "`"$TargetDir`"",
-    "-o",
-    "`"$OutputPath`""
+    "`"$TargetDir`""
 )
 
 if (-not $DryRun) {
-    $quotedArgs.Insert(2, "-ce") # Insert -ce at index 2
+    $cmdArgs += "-ce"
     Write-Log "Mode: LIVE (Extensions will be changed)" "INFO"
 } else {
     Write-Log "Mode: DRY RUN (Extensions will NOT be changed, report only)" "WARN"
 }
 
+$cmdArgs += @(
+    "-o",
+    "`"$OutputPath`""
+)
+
 $psi = New-Object System.Diagnostics.ProcessStartInfo
 $psi.FileName = $PythonExe
-$psi.Arguments = $quotedArgs -join " "
+$psi.Arguments = $cmdArgs -join " "
 $psi.WorkingDirectory = $ScriptDir
 $psi.WindowStyle = "Hidden"
 $psi.RedirectStandardOutput = $true
@@ -204,11 +200,11 @@ while (-not $proc.HasExited) {
             $errLine = $errReader.ReadLine()
             if ($errLine) { $stderrLog.AppendLine($errLine) | Out-Null }
         }
-    } catch { break } # Stream closed
+    } catch { break }
     Start-Sleep -Milliseconds 50
 }
 
-# Flush remaining output after process exits
+# Flush remaining output
 while (($line = $outReader.ReadLine()) -ne $null) { $stdoutLog.AppendLine($line) | Out-Null }
 while (($errLine = $errReader.ReadLine()) -ne $null) { $stderrLog.AppendLine($errLine) | Out-Null }
 
@@ -224,7 +220,6 @@ if ($stderr) { Write-Log "Python Error: $stderr" "WARN" }
 if ($proc.ExitCode -eq 0) {
     Write-Log "SUCCESS: Analysis complete." "SUCCESS"
     
-    # Generate HTML Summary Report
     if (Test-Path $OutputPath) {
         try {
             $data = Import-Csv -Path $OutputPath -ErrorAction Stop
